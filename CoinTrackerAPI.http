@@ -1,0 +1,6 @@
+@CoinTrackerAPI_HostAddress = http://localhost:5012
+
+GET {{CoinTrackerAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

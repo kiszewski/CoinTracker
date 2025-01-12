@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "wGCi4PXFgLE=",
+  "success": true,
+  "projectFilePath": "/Users/kiszewski/Desktop/development/personal/CoinTrackerAPI/CoinTrackerAPI.csproj",
+  "expectedPackageFiles": [
+    "/Users/kiszewski/.nuget/packages/microsoft.aspnetcore.openapi/9.0.0/microsoft.aspnetcore.openapi.9.0.0.nupkg.sha512",
+    "/Users/kiszewski/.nuget/packages/microsoft.openapi/1.6.17/microsoft.openapi.1.6.17.nupkg.sha512"
+  ],
+  "logs": []
+}
