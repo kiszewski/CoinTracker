@@ -1,5 +1,6 @@
 # Build results
 bin/
+obj/
 out/
 *.exe
 *.dll
