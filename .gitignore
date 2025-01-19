@@ -1,0 +1,92 @@
+# Build results
+bin/
+obj/
+out/
+*.exe
+*.dll
+*.pdb
+*.log
+*.vspscc
+*.vspx
+*.suo
+*.user
+*.userossc
+*.sln.docstates
+
+# Visual Studio Code settings
+.vscode/
+
+# Rider project files
+.idea/
+
+# Mono auto-generated files
+mono_crash.*
+
+# OS-specific files
+Thumbs.db
+ehthumbs.db
+*.DS_Store
+.DS_Store
+
+# Dependency caches
+*.nuget/
+packages/
+project.lock.json
+project.assets.json
+global.json
+
+# Visual Studio specific files
+.vs/
+*.vssscc
+*.sln.cache
+
+# Entity Framework
+Migrations/
+
+# ASP.NET temp files
+*.publish.xml
+publish/
+app.publish/
+
+# Configuration files
+appsettings*.json
+secrets.json
+
+# Logs
+logs/
+*.log
+*.nlog
+*.serilog
+*.log.*
+
+# Test and coverage reports
+TestResults/
+coverage/
+*.coverage
+*.trx
+*.cobertura.xml
+
+# Docker files
+.dockerignore
+docker-compose.*
+*.container.cache
+
+# Node.js dependencies (if using frontend in the same project)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Resharper files
+_ReSharper*/
+*.DotSettings.user
+
+# JetBrains Rider
+.idea/
+*.sln.iml
+
+# Local environment
+.env
+.env.*
+
+# Python virtual environment (if Python scripts exist)
+venv/
