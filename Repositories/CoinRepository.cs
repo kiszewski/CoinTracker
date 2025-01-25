@@ -1,13 +1,17 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using DotNetEnv;
+using MongoDB.Driver;
 
 class CoinRepository
 {
     private HttpClient _client;
+    private IMongoClient _mongoDB;
 
-    public CoinRepository(HttpClient client)
+    public CoinRepository(HttpClient client, IMongoClient mongoDB)
     {
         _client = client;
+        _mongoDB = mongoDB;
     }
 
     public async Task<IEnumerable<GeckoCoinDto>> GetRemoteCoinRecords()
@@ -46,7 +50,7 @@ class CoinRepository
     }
     public async Task AddCoinRecords(IEnumerable<Coin> coins)
     {
-
+        await _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins").InsertManyAsync(coins);
     }
     public async Task<IEnumerable<Coin>> GetLocalCoinRecords()
     {
