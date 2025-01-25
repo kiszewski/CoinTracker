@@ -14,7 +14,7 @@ class CoinRepository
     {
         try
         {
-            var apiKey = Environment.GetEnvironmentVariable("API_KEY");
+            var apiKey = Env.GetString("GECKO_API_KEY");
 
             var request = new HttpRequestMessage
             {
