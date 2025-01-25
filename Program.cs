@@ -1,3 +1,4 @@
+using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
@@ -10,6 +11,9 @@ BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
+Env.Load();
+
 builder.Services.AddOpenApi();
 builder.Services.AddSingleton<IMongoClient>(e =>
 {
