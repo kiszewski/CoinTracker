@@ -48,9 +48,39 @@ class CoinRepository
             return Enumerable.Empty<GeckoCoinDto>();
         }
     }
-    public async Task AddCoinRecords(IEnumerable<Coin> coins)
+    public async Task AddOrUpdateCoinRecords(IEnumerable<Coin> coins)
     {
-        await _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins").InsertManyAsync(coins);
+        try
+        {
+            var currentLocalCoins = await GetLocalCoinRecords();
+
+            if (!currentLocalCoins.Any())
+            {
+                await _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins").InsertManyAsync(coins);
+
+                return;
+            }
+
+            var coinsCollection = _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins");
+
+            foreach (var c in coins)
+            {
+                var filter = Builders<Coin>.Filter.Eq(e => e.Code, c.Code);
+                var coin = await coinsCollection.Find(filter).FirstOrDefaultAsync();
+
+                var newSnapshots = new List<CoinDataSnapshot>();
+
+                newSnapshots.AddRange(coin?.Snapshots ?? []);
+                newSnapshots.AddRange(c.Snapshots);
+
+                var update = Builders<Coin>.Update.Set(r => r.Snapshots, newSnapshots);
+                await coinsCollection.UpdateOneAsync(filter, update);
+            }
+        }
+        catch (Exception)
+        {
+            Console.WriteLine("Error");
+        }
     }
     public async Task<IEnumerable<Coin>> GetLocalCoinRecords()
     {
