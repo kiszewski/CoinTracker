@@ -54,6 +54,10 @@ class CoinRepository
     }
     public async Task<IEnumerable<Coin>> GetLocalCoinRecords()
     {
-        return Enumerable.Empty<Coin>();
+        var filter = Builders<Coin>.Filter.Empty;
+
+        var result = await _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins").Find(filter).ToListAsync();
+
+        return result;
     }
 }
