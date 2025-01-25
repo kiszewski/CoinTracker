@@ -5,5 +5,5 @@ public class Coin
     public string Code { get; set; }
     public decimal DolarPrice { get; set; }
     public long DolarMarketCap { get; set; }
-    public double Volume { get; set; }
+    public decimal Volume { get; set; }
 }

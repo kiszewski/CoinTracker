@@ -28,7 +28,7 @@ public class GeckoCoinDto
     public long? FullyDilutedValuation { get; set; }
 
     [JsonPropertyName("total_volume")]
-    public long TotalVolume { get; set; }
+    public decimal TotalVolume { get; set; }
 
     [JsonPropertyName("high_24h")]
     public decimal High24h { get; set; }
@@ -40,43 +40,40 @@ public class GeckoCoinDto
     public decimal PriceChange24h { get; set; }
 
     [JsonPropertyName("price_change_percentage_24h")]
-    public double PriceChangePercentage24h { get; set; }
+    public decimal PriceChangePercentage24h { get; set; }
 
     [JsonPropertyName("market_cap_change_24h")]
-    public long MarketCapChange24h { get; set; }
+    public decimal MarketCapChange24h { get; set; }
 
     [JsonPropertyName("market_cap_change_percentage_24h")]
-    public double MarketCapChangePercentage24h { get; set; }
+    public decimal MarketCapChangePercentage24h { get; set; }
 
     [JsonPropertyName("circulating_supply")]
     public decimal CirculatingSupply { get; set; }
 
     [JsonPropertyName("total_supply")]
-    public decimal? TotalSupply { get; set; }
+    public decimal TotalSupply { get; set; }
 
     [JsonPropertyName("max_supply")]
     public decimal? MaxSupply { get; set; }
 
     [JsonPropertyName("ath")]
-    public decimal AllTimeHigh { get; set; }
+    public decimal Ath { get; set; }
 
     [JsonPropertyName("ath_change_percentage")]
-    public double AllTimeHighChangePercentage { get; set; }
+    public decimal AthChangePercentage { get; set; }
 
     [JsonPropertyName("ath_date")]
-    public DateTime AllTimeHighDate { get; set; }
+    public DateTime AthDate { get; set; }
 
     [JsonPropertyName("atl")]
-    public decimal AllTimeLow { get; set; }
+    public decimal Atl { get; set; }
 
     [JsonPropertyName("atl_change_percentage")]
-    public double AllTimeLowChangePercentage { get; set; }
+    public decimal AtlChangePercentage { get; set; }
 
     [JsonPropertyName("atl_date")]
-    public DateTime AllTimeLowDate { get; set; }
-
-    [JsonPropertyName("roi")]
-    public object Roi { get; set; }
+    public DateTime AtlDate { get; set; }
 
     [JsonPropertyName("last_updated")]
     public DateTime LastUpdated { get; set; }
