@@ -13,7 +13,7 @@ class CoinService
 
         if (remoteRecords.Any())
         {
-            var coins = remoteRecords.Select(x => x.GeckoCoinToCoin());
+            var coins = remoteRecords.Take(50).Select(x => x.GeckoCoinToCoin());
             await _repository.AddCoinRecords(coins);
         }
     }
