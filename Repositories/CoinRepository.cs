@@ -19,11 +19,11 @@ class CoinRepository
             var request = new HttpRequestMessage
             {
                 Method = HttpMethod.Get,
-                RequestUri = new Uri("https://api.coingecko.com/api/v3/coins/list"),
+                RequestUri = new Uri("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd"),
                 Headers =
     {
         { "accept", "application/json" },
-        { "x-cg-pro-api-key", apiKey },
+        { "x-cg-demo-api-key", apiKey },
     },
             };
             using (var response = await _client.SendAsync(request))
