@@ -24,6 +24,13 @@ builder.Services.AddSingleton<IMongoClient>(e =>
 });
 builder.Services.AddHttpClient<CoinRepository>();
 builder.Services.AddSingleton<CoinService>();
+builder.Services.AddHostedService(e =>
+{
+    var logger = e.GetService<ILogger<CustomBackgroundService>>();
+    var coinService = e.GetService<CoinService>();
+
+    return new CustomBackgroundService(logger!, async () => await coinService!.PopulateCoins());
+});
 
 var app = builder.Build();
 
