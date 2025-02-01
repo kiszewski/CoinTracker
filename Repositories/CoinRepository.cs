@@ -77,9 +77,10 @@ class CoinRepository
                 await coinsCollection.UpdateOneAsync(filter, update);
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            Console.WriteLine("Error");
+            Console.WriteLine($"Coins Count {coins.Count()}");
+            Console.WriteLine($"Error {ex}");
         }
     }
     public async Task<IEnumerable<Coin>> GetLocalCoinRecords()
