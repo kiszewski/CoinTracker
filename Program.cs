@@ -25,12 +25,18 @@ builder.Services.AddSingleton<IMongoClient>(e =>
 builder.Services.AddHttpClient<CoinRepository>();
 builder.Services.AddSingleton<CoinService>();
 builder.Services.AddSingleton<EmailService>();
+builder.Services.AddSingleton<CoinUpdatesNotifierService>();
 builder.Services.AddHostedService(e =>
 {
     var logger = e.GetService<ILogger<CustomBackgroundService>>();
     var coinService = e.GetService<CoinService>();
+    var notifierService = e.GetService<CoinUpdatesNotifierService>();
 
-    return new CustomBackgroundService(logger!, async () => await coinService!.PopulateCoins());
+    return new CustomBackgroundService(logger!, async () =>
+    {
+        await coinService!.PopulateCoins();
+        await notifierService!.CheckUpdates();
+    });
 });
 
 var app = builder.Build();
@@ -43,9 +49,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/process", async ([FromServices] CoinService service) =>
+app.MapGet("/process", async ([FromServices] CoinUpdatesNotifierService service) =>
 {
-    await service.PopulateCoins();
+    await service.CheckUpdates();
 
     return Results.Ok();
 });
