@@ -18,8 +18,39 @@ class CoinService
         }
     }
 
-    public async Task AnalyzeCoins()
+    public async Task<IEnumerable<CoinReport>> AnalyzeCoinsDaily()
     {
-        await _repository.GetLocalCoinRecords();
+        var reports = Enumerable.Empty<CoinReport>();
+        var coins = await _repository.GetLocalCoinRecords();
+
+        foreach (var coin in coins)
+        {
+            var lastSnapshots = coin.Snapshots.OrderBy(e => e.date).TakeLast(2);
+
+            var oldSnaphot = lastSnapshots.First();
+            var newSnaphot = lastSnapshots.Last();
+
+            var difference = oldSnaphot.DolarPrice - newSnaphot.DolarPrice;
+
+            var percent = 0.05m;
+
+            var dolarPercent = oldSnaphot.DolarPrice * percent;
+
+            if (difference >= dolarPercent)
+            {
+                var report = new CoinReport
+                {
+                    Coin = coin,
+                    NewDolarPrice = newSnaphot.DolarPrice,
+                    OldDolarPrice = oldSnaphot.DolarPrice,
+                    NewDolarPriceDate = newSnaphot.date,
+                    OldDolarPriceDate = oldSnaphot.date,
+                };
+
+                reports.Append(report);
+            }
+        }
+
+        return reports;
     }
 }
