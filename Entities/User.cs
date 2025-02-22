@@ -1,6 +1,7 @@
 class User
 {
-    Guid Id;
-    string Email;
-    IEnumerable<Coin> FavoriteCoins = Enumerable.Empty<Coin>();
+    public Guid Id;
+    public required string Email;
+    public required string Name;
+    public required IEnumerable<Coin> FavoriteCoins = Enumerable.Empty<Coin>();
 }
