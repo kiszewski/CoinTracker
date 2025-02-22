@@ -24,6 +24,7 @@ builder.Services.AddSingleton<IMongoClient>(e =>
 });
 builder.Services.AddHttpClient<CoinRepository>();
 builder.Services.AddSingleton<CoinService>();
+builder.Services.AddSingleton<EmailService>();
 builder.Services.AddHostedService(e =>
 {
     var logger = e.GetService<ILogger<CustomBackgroundService>>();
@@ -45,6 +46,21 @@ app.UseHttpsRedirection();
 app.MapGet("/process", async ([FromServices] CoinService service) =>
 {
     await service.PopulateCoins();
+
+    return Results.Ok();
+});
+
+app.MapGet("/testEmail", async ([FromServices] EmailService service) =>
+{
+    var input = new SendEmailParams
+    {
+        RecipientEmail = "kiszewski1999@gmail.com",
+        RecipientName = "Léo",
+        Body = "Report test",
+        Subject = "Report"
+    };
+
+    await service.SendEmail(input);
 
     return Results.Ok();
 });
