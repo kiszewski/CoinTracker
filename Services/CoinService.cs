@@ -32,11 +32,11 @@ class CoinService
 
             var difference = oldSnaphot.DolarPrice - newSnaphot.DolarPrice;
 
-            var percent = 0.05m;
+            var percent = 0.01m;
 
             var dolarPercent = oldSnaphot.DolarPrice * percent;
 
-            if (difference >= dolarPercent)
+            if (Math.Abs(difference) >= dolarPercent)
             {
                 var report = new CoinReport
                 {
