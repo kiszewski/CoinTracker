@@ -2,14 +2,17 @@ class CoinUpdatesNotifierService
 {
     private CoinService _coinService;
     private EmailService _emailService;
+    private ILogger _logger;
 
     public CoinUpdatesNotifierService(
         CoinService coinService,
-        EmailService emailService
+        EmailService emailService,
+        ILogger logger
         )
     {
         _coinService = coinService;
         _emailService = emailService;
+        _logger = logger;
 
         var btc = new Coin()
         {
@@ -33,6 +36,8 @@ class CoinUpdatesNotifierService
 
         foreach (var report in reports)
         {
+            _logger.LogInformation($"Report from: {report.Coin.Code}");
+
             var interestedUsers = users.
                 Where(u => u.FavoriteCoins.Any(coin => coin.Code == report.Coin.Code));
 
@@ -45,6 +50,8 @@ class CoinUpdatesNotifierService
                     Subject = $"Updates on {report.Coin.Name}",
                     Body = $"Old Price: {report.OldDolarPrice} in {report.OldDolarPriceDate}\n" + $"New Price: {report.NewDolarPrice} in {report.NewDolarPriceDate}\n",
                 };
+
+                _logger.LogInformation($"Sending report: {report.Coin} to: {user.Name}");
 
                 await _emailService.SendEmail(mail);
             }
