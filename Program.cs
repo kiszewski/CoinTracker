@@ -15,7 +15,7 @@ BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard
 Env.Load();
 
 builder.Services.AddOpenApi();
-builder.Services.AddSingleton<IMongoClient>(e =>
+builder.Services.AddScoped<IMongoClient>(e =>
 {
     var connectionUri = Env.GetString("MONGO_DB");
     var settings = MongoClientSettings.FromConnectionString(connectionUri);
@@ -23,9 +23,9 @@ builder.Services.AddSingleton<IMongoClient>(e =>
     return new MongoClient(settings);
 });
 builder.Services.AddHttpClient<CoinRepository>();
-builder.Services.AddSingleton<CoinService>();
-builder.Services.AddSingleton<EmailService>();
-builder.Services.AddSingleton<CoinUpdatesNotifierService>();
+builder.Services.AddScoped<CoinService>();
+builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<CoinUpdatesNotifierService>();
 builder.Services.AddHostedService(e =>
 {
     var logger = e.GetService<ILogger<CustomBackgroundService>>();
