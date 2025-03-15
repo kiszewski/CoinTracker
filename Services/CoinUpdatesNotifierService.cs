@@ -2,12 +2,12 @@ class CoinUpdatesNotifierService
 {
     private CoinService _coinService;
     private EmailService _emailService;
-    private ILogger _logger;
+    private ILogger<CoinUpdatesNotifierService> _logger;
 
     public CoinUpdatesNotifierService(
         CoinService coinService,
         EmailService emailService,
-        ILogger logger
+        ILogger<CoinUpdatesNotifierService> logger
         )
     {
         _coinService = coinService;
