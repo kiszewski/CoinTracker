@@ -20,34 +20,50 @@ class CoinService
 
     public async Task<IEnumerable<CoinReport>> AnalyzeCoinsDaily()
     {
-        var reports = Enumerable.Empty<CoinReport>();
+        var reports = new List<CoinReport> { };
         var coins = await _repository.GetLocalCoinRecords();
 
         foreach (var coin in coins)
         {
-            var lastSnapshots = coin.Snapshots.OrderBy(e => e.date).TakeLast(2);
+            var lastSnapshots = coin.Snapshots.OrderBy(e => e.date).TakeLast(12);
 
-            var oldSnaphot = lastSnapshots.First();
-            var newSnaphot = lastSnapshots.Last();
+            var last = lastSnapshots.Last();
+            var lowest = lastSnapshots.MinBy(e => e.DolarPrice);
+            var highest = lastSnapshots.MaxBy(e => e.DolarPrice);
 
-            var difference = oldSnaphot.DolarPrice - newSnaphot.DolarPrice;
+            var differenceToLowest = last.DolarPrice - lowest!.DolarPrice;
+            var differenceToHighest = last.DolarPrice - highest!.DolarPrice;
 
             var percent = 0.01m;
 
-            var dolarPercent = oldSnaphot.DolarPrice * percent;
+            var dolarPercent = last.DolarPrice * percent;
 
-            if (Math.Abs(difference) >= dolarPercent)
+            if (Math.Abs(differenceToLowest) >= dolarPercent)
             {
                 var report = new CoinReport
                 {
                     Coin = coin,
-                    NewDolarPrice = newSnaphot.DolarPrice,
-                    OldDolarPrice = oldSnaphot.DolarPrice,
-                    NewDolarPriceDate = newSnaphot.date,
-                    OldDolarPriceDate = oldSnaphot.date,
+                    NewDolarPrice = last.DolarPrice,
+                    OldDolarPrice = lowest.DolarPrice,
+                    NewDolarPriceDate = last.date,
+                    OldDolarPriceDate = lowest.date,
                 };
 
-                reports.Append(report);
+                reports.Add(report);
+            }
+
+            if (Math.Abs(differenceToHighest) >= dolarPercent)
+            {
+                var report = new CoinReport
+                {
+                    Coin = coin,
+                    NewDolarPrice = last.DolarPrice,
+                    OldDolarPrice = highest.DolarPrice,
+                    NewDolarPriceDate = last.date,
+                    OldDolarPriceDate = highest.date,
+                };
+
+                reports.Add(report);
             }
         }
 
