@@ -27,14 +27,17 @@ builder.Services.AddTransient<IMongoClient>(e =>
 builder.Services.AddHttpClient<CoinRepository>();
 builder.Services.AddScoped<CoinService>();
 builder.Services.AddScoped<EmailService>();
+builder.Services.AddScoped<CoinUpdatesNotifierService>();
 
 builder.Services.AddHostedService(e =>
 {
     var logger = e.GetService<ILogger<CustomBackgroundService>>();
+    var logger2 = e.GetService<ILogger<CoinUpdatesNotifierService>>();
+
     var coinRepository = e.GetService<CoinRepository>();
     var coinService = new CoinService(coinRepository!);
     var emailService = new EmailService();
-    var notifierService = new CoinUpdatesNotifierService(coinService, emailService, logger!);
+    var notifierService = new CoinUpdatesNotifierService(coinService, emailService, logger2!);
 
     return new CustomBackgroundService(logger!, async () =>
     {
