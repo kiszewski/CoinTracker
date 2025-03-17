@@ -34,7 +34,7 @@ class CoinService
             var differenceToLowest = last.DolarPrice - lowest!.DolarPrice;
             var differenceToHighest = last.DolarPrice - highest!.DolarPrice;
 
-            var percent = 0.01m;
+            var percent = 0.05m;
 
             var dolarPercent = last.DolarPrice * percent;
 
