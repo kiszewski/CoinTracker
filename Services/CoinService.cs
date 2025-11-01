@@ -69,4 +69,26 @@ class CoinService
 
         return reports;
     }
+
+    public async Task<CoinWeeklyReport?> AnalyzeCoinWeekly(Coin coin)
+    {
+        var localCoin = await _repository.GetCoin(coin.Code);
+        var lastWeekStartDate = DateTimeOffset.Now.Subtract(TimeSpan.FromDays(7));
+
+        if (localCoin == null) return null;
+
+        var lastSnapshots = localCoin.Snapshots.Where(s => s.date > lastWeekStartDate).ToArray();
+
+        var highest = lastSnapshots.MaxBy(e => e.DolarPrice);
+        var lowest = lastSnapshots.MinBy(e => e.DolarPrice);
+
+        var report = new CoinWeeklyReport
+        {
+            Coin = localCoin,
+            Highest = highest?.DolarPrice ?? 0,
+            Lowest = lowest?.DolarPrice ?? 0,
+        };
+
+        return report;
+    }
 }
