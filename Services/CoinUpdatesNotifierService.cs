@@ -3,6 +3,7 @@ class CoinUpdatesNotifierService
     private CoinService _coinService;
     private EmailService _emailService;
     private ILogger<CoinUpdatesNotifierService> _logger;
+    private DateTimeOffset? _lastReportSendDate;
 
     public CoinUpdatesNotifierService(
         CoinService coinService,
@@ -54,6 +55,47 @@ class CoinUpdatesNotifierService
                 _logger.LogInformation($"Sending report: {report.Coin} to: {user.Name}");
 
                 await _emailService.SendEmail(mail);
+            }
+        }
+    }
+
+    public async Task SendWeeklyReport()
+    {
+        var now = DateTimeOffset.Now;
+        var isFriday = now.DayOfWeek == DayOfWeek.Friday;
+        var lastReportWasNotSent = _lastReportSendDate == null
+            || now.Subtract(_lastReportSendDate ?? DateTimeOffset.MinValue).TotalDays >= 7;
+
+        if (isFriday && lastReportWasNotSent)
+        {
+            var report = await _coinService.AnalyzeCoinWeekly(new Coin()
+            {
+                Name = "Bitcoin",
+                Code = "bitcoin"
+            });
+
+            if (report != null)
+            {
+                var interestedUsers = users.Where(u => u.FavoriteCoins.Any(coin => coin.Code == report.Coin.Code));
+
+                foreach (var user in interestedUsers)
+                {
+                    var mail = new SendEmailParams
+                    {
+                        RecipientName = user.Name,
+                        RecipientEmail = user.Email,
+                        Subject = $"Weekly Report: {report.Coin.Name}",
+                        Body = $"HighestPrice: {report.Highest}\n" + $"Lowest Price: {report.Lowest}\n",
+                    };
+
+                    _logger.LogInformation($"Sending weekly report: {report.Coin} to: {user.Name}");
+
+                    await _emailService.SendEmail(mail);
+                }
+            }
+            else
+            {
+                _logger.LogInformation($"No report to send");
             }
         }
     }
