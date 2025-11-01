@@ -24,8 +24,7 @@ class EmailService
             message.From.Add(new MailboxAddress("CoinTracker", SenderEmail));
             message.To.Add(new MailboxAddress(param.RecipientName, param.RecipientEmail));
             message.Subject = param.Subject;
-            message.Body = new TextPart("plain") { Text = param.Body };
-
+            message.Body = param.Body;
             using (var client = new SmtpClient())
             {
                 await client.ConnectAsync("in-v3.mailjet.com", 587, SecureSocketOptions.StartTls);
