@@ -43,6 +43,7 @@ builder.Services.AddHostedService(e =>
     {
         await coinService!.PopulateCoins();
         await notifierService!.CheckUpdates();
+        await notifierService!.SendWeeklyReport();
     });
 });
 
@@ -73,9 +74,9 @@ app.MapGet("/testEmail", async ([FromServices] EmailService service) =>
         Subject = "Report"
     };
 
-    await service.SendEmail(input);
+    var response = await service.SendEmail(input);
 
-    return Results.Ok();
+    return Results.Ok($"Response: {response}");
 });
 
 app.Run();
