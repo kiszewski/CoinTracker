@@ -91,4 +91,10 @@ class CoinRepository
 
         return result;
     }
+    public async Task<Coin?> GetCoin(string coinCode)
+    {
+        var filter = Builders<Coin>.Filter.Eq(c => c.Code, coinCode);
+
+        return await _mongoDB.GetDatabase("CoinsDB").GetCollection<Coin>("coins").Find(filter).FirstOrDefaultAsync();
+    }
 }
