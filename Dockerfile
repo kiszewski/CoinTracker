@@ -1,7 +1,7 @@
 # Use .NET 9 as the base runtime image
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-preview AS base
 WORKDIR /app
-EXPOSE 80
+EXPOSE 8080
 EXPOSE 443
 
 # Use .NET 9 SDK for building the project
