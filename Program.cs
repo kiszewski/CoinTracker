@@ -1,5 +1,7 @@
 using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
+using MimeKit;
+using MimeKit.Text;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
@@ -66,11 +68,55 @@ app.MapGet("/process", async ([FromServices] CoinUpdatesNotifierService service)
 
 app.MapGet("/testEmail", async ([FromServices] EmailService service) =>
 {
+    string html = $@"
+        <html>
+        <head>
+            <style>
+                body {{
+                    font-family: 'Segoe UI', sans-serif;
+                    background-color: #f9f9f9;
+                    padding: 20px;
+                }}
+                .card {{
+                    background-color: white;
+                    border-radius: 12px;
+                    padding: 24px;
+                    max-width: 500px;
+                    margin: auto;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }}
+                .title {{
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #333;
+                }}
+                .priceHigh{{
+                    font-size: 32px;
+                    font-weight: bold;
+                    color: #28a745;
+                }}
+                .priceLow {{
+                    font-size: 32px;
+                    font-weight: bold;
+                    color: #dc3545;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class='card'>
+                <div class='title'>Teste report weekly</div>
+                <div class='priceHigh'>▲ $100 USD</div>
+                <div class='priceLow'>▼ $50 USD</div>
+            </div>
+        </body>
+        </html>
+        ";
+
     var input = new SendEmailParams
     {
         RecipientEmail = "kiszewski1999@gmail.com",
         RecipientName = "Léo",
-        Body = "Report test",
+        Body = new TextPart(TextFormat.Html) { Text = html },
         Subject = "Report"
     };
 
