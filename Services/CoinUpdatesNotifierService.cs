@@ -99,6 +99,8 @@ class CoinUpdatesNotifierService
 
                     await _emailService.SendEmail(mail);
                 }
+
+                _lastReportSendDate = DateTimeOffset.Now;
             }
             else
             {
