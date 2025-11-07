@@ -6,7 +6,7 @@ class CoinUpdatesNotifierService
     private CoinService _coinService;
     private EmailService _emailService;
     private ILogger<CoinUpdatesNotifierService> _logger;
-    private DateTimeOffset? _lastReportSendDate;
+    private DateTimeOffset _lastReportSendDate = DateTimeOffset.MinValue;
 
     public CoinUpdatesNotifierService(
         CoinService coinService,
@@ -70,8 +70,7 @@ class CoinUpdatesNotifierService
     {
         var now = DateTimeOffset.Now;
         var isFriday = now.DayOfWeek == DayOfWeek.Friday;
-        var lastReportWasNotSent = _lastReportSendDate == null
-            || now.Subtract(_lastReportSendDate ?? DateTimeOffset.MinValue).TotalDays >= 7;
+        var lastReportWasNotSent = Math.Abs(now.Subtract(_lastReportSendDate).TotalDays) >= 7;
 
         if (isFriday && lastReportWasNotSent)
         {
