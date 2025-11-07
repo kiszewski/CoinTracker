@@ -47,10 +47,6 @@ class CoinUpdatesNotifierService
 
             foreach (var user in interestedUsers)
             {
-
-
-
-
                 var mail = new SendEmailParams
                 {
                     RecipientName = user.Name,
@@ -71,6 +67,8 @@ class CoinUpdatesNotifierService
         var now = DateTimeOffset.Now;
         var isFriday = now.DayOfWeek == DayOfWeek.Friday;
         var lastReportWasNotSent = Math.Abs(now.Subtract(_lastReportSendDate).TotalDays) >= 7;
+
+        _logger.LogInformation($"Last report send date: {_lastReportSendDate} flag: {lastReportWasNotSent}");
 
         if (isFriday && lastReportWasNotSent)
         {
