@@ -7,17 +7,6 @@ class CoinService
         _repository = repository;
     }
 
-    public async Task PopulateCoins()
-    {
-        var remoteRecords = await _repository.GetRemoteCoinRecords();
-
-        if (remoteRecords.Any())
-        {
-            var coins = remoteRecords.Take(50).Select(x => x.GeckoCoinToCoin());
-            await _repository.AddOrUpdateCoinRecords(coins);
-        }
-    }
-
     public async Task<IEnumerable<CoinReport>> AnalyzeCoinsDaily()
     {
         var reports = new List<CoinReport> { };
