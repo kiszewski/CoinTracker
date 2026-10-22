@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using CoinTracker.Infrastructure.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -40,11 +41,24 @@ public sealed class CoinGeckoMarketDataProvider(HttpClient httpClient, IOptions<
 
 public sealed class GeckoCoinDto
 {
+    [JsonPropertyName("id")]
     public string Id { get; set; } = "";
+
+    [JsonPropertyName("symbol")]
     public string Symbol { get; set; } = "";
+
+    [JsonPropertyName("name")]
     public string Name { get; set; } = "";
+
+    [JsonPropertyName("current_price")]
     public decimal CurrentPrice { get; set; }
+
+    [JsonPropertyName("market_cap")]
     public long MarketCap { get; set; }
+
+    [JsonPropertyName("total_volume")]
     public decimal TotalVolume { get; set; }
+
+    [JsonPropertyName("last_updated")]
     public DateTime LastUpdated { get; set; }
 }

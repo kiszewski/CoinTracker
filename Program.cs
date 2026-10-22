@@ -7,9 +7,15 @@ using CoinTracker.Modules.Reporting;
 using CoinTracker.Shared.Messaging;
 using CoinTracker.Shared.Observability;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Use one explicit GUID representation for all persisted Guid fields. Without this,
+// MongoDB.Driver 3.x leaves GuidRepresentation unspecified and rejects serialization.
+BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
 
 builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
 builder.Services.AddOpenApi();
