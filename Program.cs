@@ -1,48 +1,62 @@
-using DotNetEnv;
 using Microsoft.AspNetCore.Mvc;
-using MimeKit;
-using MimeKit.Text;
+using CoinTracker.Infrastructure.Configuration;
+using CoinTracker.Infrastructure.Persistence;
+using CoinTracker.Modules.Delivery;
+using CoinTracker.Modules.Ingestion;
+using CoinTracker.Modules.Reporting;
+using CoinTracker.Shared.Messaging;
+using CoinTracker.Shared.Observability;
 using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
-
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-
-Env.Load();
-
+builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
 builder.Services.AddOpenApi();
 
-builder.Services.AddTransient<IMongoClient>(e =>
+builder.Services.AddOptions<MongoOptions>()
+    .Bind(builder.Configuration.GetSection("Mongo"))
+    .Validate(x => Uri.TryCreate(x.ConnectionString, UriKind.Absolute, out _), "Mongo:ConnectionString must be a valid MongoDB URI.")
+    .ValidateOnStart();
+builder.Services.AddOptions<RabbitMqOptions>()
+    .Bind(builder.Configuration.GetSection("RabbitMq"))
+    .Validate(x => Uri.TryCreate(x.ConnectionString, UriKind.Absolute, out var uri) && uri.Scheme is "amqp" or "amqps", "RabbitMq:ConnectionString must be an amqp or amqps URI.")
+    .Validate(x => x.RetryCount == 5 && x.RetryIntervalSeconds == 30, "The current event retry policy is five retries at 30-second intervals.")
+    .ValidateOnStart();
+builder.Services.AddOptions<MarketDataOptions>()
+    .Bind(builder.Configuration.GetSection("MarketData"))
+    .Validate(x => Uri.TryCreate(x.MarketsUrl, UriKind.Absolute, out _), "MarketData:MarketsUrl must be an absolute URI.")
+    .Validate(x => x.PopulationIntervalHours > 0, "MarketData:PopulationIntervalHours must be greater than zero.")
+    .ValidateOnStart();
+builder.Services.AddOptions<AnalysisOptions>()
+    .Bind(builder.Configuration.GetSection("Analysis"))
+    .Validate(x => x.MovementThresholdPercent > 0 && x.LookbackHours > 0, "Daily analysis threshold and lookback must be positive.")
+    .ValidateOnStart();
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection("Email"));
+
+builder.Services.AddSingleton<IMongoClient>(services =>
 {
-    var connectionUri = Env.GetString("MONGO_DB");
-    var settings = MongoClientSettings.FromConnectionString(connectionUri);
-
-    return new MongoClient(settings);
+    var mongoOptions = services.GetRequiredService<Microsoft.Extensions.Options.IOptions<MongoOptions>>().Value;
+    return new MongoClient(MongoClientSettings.FromConnectionString(mongoOptions.ConnectionString));
 });
+builder.Services.AddSingleton<MongoStore>();
+builder.Services.AddSingleton<RabbitMqConnectionFactory>();
 
-builder.Services.AddHttpClient<CoinRepository>();
-builder.Services.AddScoped<CoinService>();
-builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<CoinUpdatesNotifierService>();
+builder.Services.AddHttpClient<IMarketDataProvider, CoinGeckoMarketDataProvider>(client => client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddScoped<PopulateMarketData>();
+builder.Services.AddScoped<ReportAnalysisService>();
+builder.Services.AddSingleton<IReportRule, DailyPriceMovementRule>();
+builder.Services.AddScoped<DeliveryInboxService>();
+builder.Services.AddSingleton<EmailSender>();
+builder.Services.AddSingleton<IReportEmailTemplateRenderer, ReportEmailTemplateRenderer>();
+builder.Services.AddSingleton<IDeliveryChannel, EmailDeliveryChannel>();
 
-builder.Services.AddHostedService(e =>
-{
-    var logger = e.GetService<ILogger<CustomBackgroundService>>();
-
-    var coinRepository = e.GetService<CoinRepository>();
-    var coinService = new PopulateCoinsService(coinRepository!);
-
-    return new CustomBackgroundService(logger!, async () =>
-    {
-        await coinService!.PopulateCoins();
-    });
-});
+builder.Services.AddHostedService<MongoInitializationService>();
+builder.Services.AddHostedService<MarketDataPopulationWorker>();
+builder.Services.AddHostedService<OutboxPublisherWorker>();
+builder.Services.AddHostedService<EventConsumersWorker>();
+builder.Services.AddHostedService<EmailDeliveryWorker>();
+builder.Services.AddHostedService<RabbitMqQueueMetricsWorker>();
 
 var app = builder.Build();
 
@@ -52,72 +66,30 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection();
-
-app.MapGet("/process", async ([FromServices] CoinUpdatesNotifierService service) =>
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/health/ready", async (
+    MongoStore store,
+    RabbitMqConnectionFactory rabbitConnectionFactory,
+    Microsoft.Extensions.Options.IOptions<MarketDataOptions> marketDataOptions,
+    Microsoft.Extensions.Options.IOptions<EmailOptions> emailOptions,
+    CancellationToken cancellationToken) =>
 {
-    await service.CheckUpdates();
-
-    return Results.Ok();
-});
-
-app.MapGet("/testEmail", async ([FromServices] EmailService service) =>
-{
-    string html = $@"
-        <html>
-        <head>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', sans-serif;
-                    background-color: #f9f9f9;
-                    padding: 20px;
-                }}
-                .card {{
-                    background-color: white;
-                    border-radius: 12px;
-                    padding: 24px;
-                    max-width: 500px;
-                    margin: auto;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                }}
-                .title {{
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #333;
-                }}
-                .priceHigh{{
-                    font-size: 32px;
-                    font-weight: bold;
-                    color: #28a745;
-                }}
-                .priceLow {{
-                    font-size: 32px;
-                    font-weight: bold;
-                    color: #dc3545;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class='card'>
-                <div class='title'>Teste report weekly</div>
-                <div class='priceHigh'>▲ $100 USD</div>
-                <div class='priceLow'>▼ $50 USD</div>
-            </div>
-        </body>
-        </html>
-        ";
-
-    var input = new SendEmailParams
+    try
     {
-        RecipientEmail = "kiszewski1999@gmail.com",
-        RecipientName = "Léo",
-        Body = new TextPart(TextFormat.Html) { Text = html },
-        Subject = "Report"
-    };
-
-    var response = await service.SendEmail(input);
-
-    return Results.Ok($"Response: {response}");
+        await store.Database.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: cancellationToken);
+        using var connection = rabbitConnectionFactory.CreateConnection();
+        var providerConfigured = !string.IsNullOrWhiteSpace(marketDataOptions.Value.ApiKey);
+        var emailConfigured = !string.IsNullOrWhiteSpace(emailOptions.Value.ApiKey) &&
+                              !string.IsNullOrWhiteSpace(emailOptions.Value.SenderEmail) &&
+                              !string.IsNullOrWhiteSpace(emailOptions.Value.SenderPassword);
+        if (!providerConfigured || !emailConfigured)
+            return Results.Json(new { status = "not-ready", providerConfigured, emailConfigured }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        return Results.Ok(new { status = "ready" });
+    }
+    catch
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
 });
 
 app.Run();

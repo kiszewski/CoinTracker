@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+appsettings*.json
+bin/
+obj/
+specs/
+node_modules/
+TestResults/
+coverage/

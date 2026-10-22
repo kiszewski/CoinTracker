@@ -1,11 +1,11 @@
 # Use .NET 9 as the base runtime image
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-preview AS base
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 443
 
 # Use .NET 9 SDK for building the project
-FROM mcr.microsoft.com/dotnet/sdk:9.0-preview AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copy the project file and restore dependencies
