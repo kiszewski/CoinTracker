@@ -11,7 +11,7 @@ services:
       RabbitMq__RetryCount: 5
       RabbitMq__RetryIntervalSeconds: 30
       MarketData__ApiKey: ${GECKO_API_KEY:-}
-      MarketData__PopulationIntervalHours: 2
+      MarketData__PopulationIntervalMinutes: 15
       Analysis__MovementThresholdPercent: 5
       Analysis__LookbackHours: 24
       Email__ApiKey: ${MAILJET_API_KEY:-}

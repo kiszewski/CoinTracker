@@ -19,7 +19,7 @@ public sealed class MarketDataOptions
 {
     public string ApiKey { get; set; } = "";
     public string MarketsUrl { get; set; } = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&per_page=50&page=1";
-    public int PopulationIntervalHours { get; set; } = 2;
+    public int PopulationIntervalMinutes { get; set; } = 15;
 }
 
 public sealed class AnalysisOptions

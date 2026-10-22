@@ -37,7 +37,7 @@ Exit condition: a test event survives application and RabbitMQ restarts, reaches
 - [x] `ING-02` Implement the CoinGecko provider adapter.
 - [x] `ING-03` Separate external API access from MongoDB persistence.
 - [x] `ING-04` Add ingestion-run and snapshot records with uniqueness rules.
-- [x] `ING-05` Replace the current timer callback with an awaited, non-overlapping worker.
+- [x] `ING-05` Replace the current timer callback with an awaited, non-overlapping worker that runs immediately and then every 15 minutes by default.
 - [x] `ING-06` Save `market-data.populated.v1` through the outbox after successful persistence.
 - [x] `ING-07` Add timeout, cancellation, response validation, and provider error handling.
 - [ ] `ING-08` Test successful, empty, invalid, failed, and duplicate population runs.

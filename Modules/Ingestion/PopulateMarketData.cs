@@ -145,7 +145,7 @@ public sealed class MarketDataPopulationWorker(
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var interval = TimeSpan.FromHours(Math.Max(1, options.Value.PopulationIntervalHours));
+        var interval = TimeSpan.FromMinutes(Math.Max(1, options.Value.PopulationIntervalMinutes));
         using var timer = new PeriodicTimer(interval);
 
         do

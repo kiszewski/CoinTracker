@@ -92,7 +92,7 @@ The event must identify the report so the delivery component can find its conten
 
 ### Data population
 
-- `POP-01` The system must collect market data on a configurable schedule.
+- `POP-01` The system must collect market data every 15 minutes by default, using a schedule configurable in whole minutes.
 - `POP-02` A new run must not start while a previous run is still active.
 - `POP-03` Invalid or incomplete external data must not be treated as a successful population; prices must be present and greater than zero.
 - `POP-04` A successful run must produce one Data Populated event.
@@ -178,6 +178,10 @@ Given email delivery is temporarily unavailable, when a report is ready, then th
 ### Failed population
 
 Given the external provider returns invalid data or is unavailable, when a population run finishes, then its failure is recorded and report analysis does not begin.
+
+### Scheduled population
+
+Given the population interval uses its default configuration, when the application is running, then market data collection starts immediately and repeats every 15 minutes without overlapping runs.
 
 ### New delivery channel
 

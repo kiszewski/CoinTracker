@@ -32,7 +32,7 @@ builder.Services.AddOptions<RabbitMqOptions>()
 builder.Services.AddOptions<MarketDataOptions>()
     .Bind(builder.Configuration.GetSection("MarketData"))
     .Validate(x => Uri.TryCreate(x.MarketsUrl, UriKind.Absolute, out _), "MarketData:MarketsUrl must be an absolute URI.")
-    .Validate(x => x.PopulationIntervalHours > 0, "MarketData:PopulationIntervalHours must be greater than zero.")
+    .Validate(x => x.PopulationIntervalMinutes > 0, "MarketData:PopulationIntervalMinutes must be greater than zero.")
     .ValidateOnStart();
 builder.Services.AddOptions<AnalysisOptions>()
     .Bind(builder.Configuration.GetSection("Analysis"))

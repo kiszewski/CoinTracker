@@ -88,7 +88,7 @@ Keep email rendering separate from SMTP transport:
 
 ### TD-07 — Hosted workers perform background work
 
-Use awaited .NET `BackgroundService` implementations for scheduled population, outbox publication, RabbitMQ consumers, and delivery execution.
+Use awaited .NET `BackgroundService` implementations for scheduled population, outbox publication, RabbitMQ consumers, and delivery execution. Configure population in whole minutes with a 15-minute default interval.
 
 Every worker must support cancellation and graceful shutdown. Scheduled population must prevent overlapping runs.
 
