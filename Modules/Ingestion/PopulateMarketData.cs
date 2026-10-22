@@ -204,6 +204,11 @@ public sealed class MarketDataPopulationWorker(
         {
             return false;
         }
+        catch (MongoCommandException exception) when (exception.Code == 11000)
+        {
+            // findAndModify reports a competing upsert against the lease _id as a command error.
+            return false;
+        }
     }
 
     private Task ReleaseRunLeaseAsync(CancellationToken cancellationToken)

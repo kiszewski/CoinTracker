@@ -57,9 +57,11 @@ public sealed class OutboxPublisherWorker(
     {
         var now = DateTime.UtcNow;
         var leases = store.Database.GetCollection<OutboxPublishLeaseDocument>(MongoStore.LeasesCollection);
-        var filter = Builders<OutboxPublishLeaseDocument>.Filter.Or(
-            Builders<OutboxPublishLeaseDocument>.Filter.Lt(x => x.ExpiresAtUtc, now),
-            Builders<OutboxPublishLeaseDocument>.Filter.Eq(x => x.Owner, _owner));
+        var filter = Builders<OutboxPublishLeaseDocument>.Filter.And(
+            Builders<OutboxPublishLeaseDocument>.Filter.Eq(x => x.Id, "outbox-publisher"),
+            Builders<OutboxPublishLeaseDocument>.Filter.Or(
+                Builders<OutboxPublishLeaseDocument>.Filter.Lt(x => x.ExpiresAtUtc, now),
+                Builders<OutboxPublishLeaseDocument>.Filter.Eq(x => x.Owner, _owner)));
         var update = Builders<OutboxPublishLeaseDocument>.Update
             .SetOnInsert(x => x.Id, "outbox-publisher")
             .Set(x => x.Owner, _owner)
@@ -73,6 +75,11 @@ public sealed class OutboxPublisherWorker(
         }
         catch (MongoWriteException exception) when (exception.WriteError?.Category == ServerErrorCategory.DuplicateKey)
         {
+            return false;
+        }
+        catch (MongoCommandException exception) when (exception.Code == 11000)
+        {
+            // findAndModify reports a competing upsert against the lease _id as a command error.
             return false;
         }
     }
