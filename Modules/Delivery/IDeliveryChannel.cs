@@ -1,4 +1,7 @@
 using CoinTracker.Infrastructure.Persistence;
+using CoinTracker.Modules.Users;
+using MongoDB.Driver;
+using System.Net;
 using System.Text.Encodings.Web;
 
 namespace CoinTracker.Modules.Delivery;
@@ -45,6 +48,36 @@ public sealed class EmailDeliveryChannel(EmailSender emailSender, IReportEmailTe
     {
         return emailSender.SendAsync(delivery.Id, delivery.RecipientEmail, delivery.RecipientName, report,
             templateRenderer.Render(report), cancellationToken);
+    }
+}
+
+public sealed class DiscordDeliveryChannel(MongoStore store, UserProfileService profiles, IHttpClientFactory clients) : IDeliveryChannel
+{
+    public string Name => "discord";
+
+    public async Task DeliverAsync(DeliveryDocument delivery, CoinReportDocument report, CancellationToken cancellationToken)
+    {
+        if (delivery.UserId is null || delivery.DiscordEndpointId is null)
+            throw new PermanentDeliveryException("Discord delivery is missing its destination reference.");
+        var user = await store.Database.GetCollection<UserDocument>(MongoStore.UsersCollection)
+            .Find(x => x.Id == delivery.UserId.Value).FirstOrDefaultAsync(cancellationToken);
+        var endpoint = user?.DiscordEndpoints.FirstOrDefault(x => x.Id == delivery.DiscordEndpointId.Value);
+        if (endpoint is null) throw new PermanentDeliveryException("Discord endpoint is no longer available.");
+
+        var url = profiles.Decrypt(endpoint.EncryptedUrl);
+        var builder = new UriBuilder(url) { Query = "wait=true" };
+        var payload = new
+        {
+            embeds = new[] { new {
+                title = $"{report.CoinName} ({report.CoinCode.ToUpperInvariant()}) price movement",
+                description = $"Movement: {report.PercentChanged:F2}%\nPrevious: ${report.OldUsdPrice:F2} USD\nLatest: ${report.NewUsdPrice:F2} USD\nPeriod: {report.PeriodStartUtc:yyyy-MM-dd HH:mm}–{report.PeriodEndUtc:yyyy-MM-dd HH:mm} UTC",
+                color = report.PercentChanged >= 0 ? 0x28A745 : 0xDC3545
+            } }
+        };
+        using var request = new HttpRequestMessage(HttpMethod.Post, builder.Uri) { Content = System.Net.Http.Json.JsonContent.Create(payload) };
+        using var response = await clients.CreateClient("discord").SendAsync(request, cancellationToken);
+        if (response.StatusCode != HttpStatusCode.OK)
+            throw new PermanentDeliveryException($"Discord returned HTTP {(int)response.StatusCode}.");
     }
 }
 

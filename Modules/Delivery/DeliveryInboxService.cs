@@ -29,27 +29,34 @@ public sealed class DeliveryInboxService(MongoStore store, ILogger<DeliveryInbox
             {
                 if (!await processed.Find(session, x => x.Id == processedId).AnyAsync(cancellationToken))
                 {
-                    var recipient = InitialRecipient.Instance;
-                    if (recipient.FavoriteCoins.Contains(message.Payload.CoinCode, StringComparer.OrdinalIgnoreCase))
+                    var audience = store.Database.GetCollection<ReportAudienceDocument>(MongoStore.ReportAudiencesCollection);
+                    var userIds = await audience.Find(session, x => x.ReportId == message.Payload.ReportId).Project(x => x.UserId).ToListAsync(cancellationToken);
+                    var users = store.Database.GetCollection<UserDocument>(MongoStore.UsersCollection);
+                    var deliveries = store.Database.GetCollection<DeliveryDocument>(MongoStore.DeliveriesCollection);
+                    foreach (var userId in userIds)
                     {
-                        var deliveryId = $"{message.Payload.ReportId:N}:{recipient.Email.ToLowerInvariant()}:email";
-                        var deliveries = store.Database.GetCollection<DeliveryDocument>(MongoStore.DeliveriesCollection);
-                        if (!await deliveries.Find(session, x => x.Id == deliveryId).AnyAsync(cancellationToken))
+                        var user = await users.Find(session, x => x.Id == userId).FirstOrDefaultAsync(cancellationToken);
+                        var now = DateTime.UtcNow;
+                        if (user is null)
                         {
-                            await deliveries.InsertOneAsync(session, new DeliveryDocument
-                            {
-                                Id = deliveryId,
-                                ReportId = message.Payload.ReportId,
-                                CorrelationId = message.CorrelationId,
-                                RecipientEmail = recipient.Email,
-                                RecipientName = recipient.Name,
-                                Channel = "email",
-                                Status = "pending",
-                                Attempts = 0,
-                                NextAttemptAtUtc = DateTime.UtcNow,
-                                CreatedAtUtc = DateTime.UtcNow
-                            }, cancellationToken: cancellationToken);
+                            await deliveries.UpdateOneAsync(session, x => x.Id == $"{message.Payload.ReportId:N}:{userId:N}:email", Builders<DeliveryDocument>.Update
+                                .SetOnInsert(x => x.ReportId, message.Payload.ReportId).SetOnInsert(x => x.CorrelationId, message.CorrelationId)
+                                .SetOnInsert(x => x.UserId, userId).SetOnInsert(x => x.Channel, "email").SetOnInsert(x => x.Status, "unavailable")
+                                .SetOnInsert(x => x.LastError, "Qualified recipient profile is unavailable.").SetOnInsert(x => x.Attempts, 0)
+                                .SetOnInsert(x => x.NextAttemptAtUtc, now).SetOnInsert(x => x.CreatedAtUtc, now), new UpdateOptions { IsUpsert = true }, cancellationToken);
+                            continue;
                         }
+                        await deliveries.UpdateOneAsync(session, x => x.Id == $"{message.Payload.ReportId:N}:{user.Id:N}:email", Builders<DeliveryDocument>.Update
+                            .SetOnInsert(x => x.ReportId, message.Payload.ReportId).SetOnInsert(x => x.CorrelationId, message.CorrelationId)
+                            .SetOnInsert(x => x.UserId, user.Id).SetOnInsert(x => x.RecipientEmail, user.Email).SetOnInsert(x => x.RecipientName, user.Name)
+                            .SetOnInsert(x => x.Channel, "email").SetOnInsert(x => x.Status, "pending").SetOnInsert(x => x.Attempts, 0)
+                            .SetOnInsert(x => x.NextAttemptAtUtc, now).SetOnInsert(x => x.CreatedAtUtc, now), new UpdateOptions { IsUpsert = true }, cancellationToken);
+                        foreach (var endpoint in user.DiscordEndpoints)
+                            await deliveries.UpdateOneAsync(session, x => x.Id == $"{message.Payload.ReportId:N}:{user.Id:N}:discord:{endpoint.Id:N}", Builders<DeliveryDocument>.Update
+                                .SetOnInsert(x => x.ReportId, message.Payload.ReportId).SetOnInsert(x => x.CorrelationId, message.CorrelationId)
+                                .SetOnInsert(x => x.UserId, user.Id).SetOnInsert(x => x.DiscordEndpointId, endpoint.Id)
+                                .SetOnInsert(x => x.RecipientName, user.Name).SetOnInsert(x => x.Channel, "discord").SetOnInsert(x => x.Status, "pending")
+                                .SetOnInsert(x => x.Attempts, 0).SetOnInsert(x => x.NextAttemptAtUtc, now).SetOnInsert(x => x.CreatedAtUtc, now), new UpdateOptions { IsUpsert = true }, cancellationToken);
                     }
 
                     await processed.InsertOneAsync(session, new ProcessedMessageDocument
@@ -72,12 +79,4 @@ public sealed class DeliveryInboxService(MongoStore store, ILogger<DeliveryInbox
 
         logger.LogInformation("Processed report event {ReportId} for delivery", message.Payload.ReportId);
     }
-}
-
-internal sealed class InitialRecipient
-{
-    public static InitialRecipient Instance { get; } = new();
-    public string Name => "Leonardo";
-    public string Email => "kiszewski1999@gmail.com";
-    public IReadOnlyList<string> FavoriteCoins => ["bitcoin"];
 }

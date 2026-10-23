@@ -3,6 +3,7 @@
 Status: Proposed  
 System specification: [`spec.md`](spec.md)  
 Implementation tasks: [`tasks.md`](tasks.md)
+User-preferences plan: [`../user-preferences/plan.md`](../user-preferences/plan.md)
 
 ## 1. Purpose
 
@@ -14,7 +15,7 @@ This document translates the system specification into technical decisions and a
 
 Keep one deployable .NET application for the first release, divided into Data Population, Report Analysis, Delivery, and shared messaging modules.
 
-The components communicate only through event contracts. They must not call another component's concrete application services.
+Business workflows communicate through versioned event contracts; components must not call another component's concrete application services. Explicit read-only data ports may expose the small cross-module projections needed for decisions such as report eligibility, without transferring application-service ownership. The user-threshold read path is defined in [`../user-preferences/plan.md`](../user-preferences/plan.md).
 
 This keeps deployment simple while allowing a component to become an independent service later.
 
@@ -72,13 +73,13 @@ The report key prevents an older or duplicate population event from creating ano
 
 ### TD-05 — MongoDB remains the application database
 
-Continue using MongoDB for ingestion runs, market snapshots, reports, delivery records, processed-message IDs, and the publication outbox. Keep the initial hard-coded recipient and favorite-coin list in application code for now.
+Continue using MongoDB for ingestion runs, market snapshots, user profiles and preferences, reports and qualified-audience snapshots, delivery records, processed-message IDs, and the publication outbox. Do not seed or migrate the former hard-coded recipient. User profile and Discord delivery details are defined in [`../user-preferences/plan.md`](../user-preferences/plan.md).
 
 Store market observations as separate snapshot records instead of allowing arrays inside coin documents to grow indefinitely.
 
 ### TD-06 — Delivery channels use a common interface
 
-Define `IDeliveryChannel` with a stable channel name and an asynchronous send operation. Implement email first.
+Define `IDeliveryChannel` with a stable channel name and an asynchronous send operation. V1 implements email and Discord incoming webhooks. Channel-specific configuration and behavior are defined in [`../user-preferences/plan.md`](../user-preferences/plan.md).
 
 Keep email rendering separate from SMTP transport:
 
@@ -98,11 +99,11 @@ Use validated options for MongoDB, RabbitMQ, CoinGecko, Mailjet, schedules, anal
 
 Secrets remain in environment-specific secret storage and must not be committed.
 
-### TD-09 — Initial daily movement parameters
+### TD-09 — Daily movement analysis uses per-user thresholds
 
-The daily price-movement rule uses a 5% threshold and a 24-hour lookback period. A movement of exactly 5% qualifies. Reject non-positive prices during data validation so percentage calculations always have a valid denominator.
+The daily price-movement rule uses a 24-hour lookback period. There is no system-wide movement threshold; each user's configured threshold for a favorite coin determines whether that user qualifies. A movement equal to a user's threshold qualifies. Reject non-positive prices during data validation so percentage calculations always have a valid denominator.
 
-Keep both values in typed configuration so they can be changed without modifying the analysis implementation.
+Keep the lookback in typed configuration. Store user thresholds with favorite-coin preferences in MongoDB rather than global application configuration. Detailed profile, report audience, and delivery behavior is defined in [`../user-preferences/plan.md`](../user-preferences/plan.md).
 
 When a population event is handled, query MongoDB for the latest stored snapshot for each coin. Use the latest stored data at handling time; the event's ingestion-run ID provides context and correlation, but does not limit analysis to that run's snapshots.
 
@@ -113,11 +114,11 @@ For each coin, calculate the effective comparison window as follows:
 3. If that report was created within the default window, move the window start to the report's creation time.
 4. Select snapshots strictly after the effective start and no later than the newest snapshot.
 5. Compare the newest snapshot with every earlier snapshot in the selected window using `(newPrice - oldPrice) / oldPrice × 100`.
-6. If one or more comparisons have an absolute change of at least 5%, create at most one report for that coin and latest snapshot.
+6. If one or more comparisons meet at least one favoriting user's threshold, create at most one report for that coin and latest snapshot, with a snapshot of the qualifying user IDs.
 
 Use the comparison with the greatest absolute percentage change as the report's reference price and direction. Require at least one earlier snapshot in the effective window; otherwise, do not create a report. Serialize analysis for a given coin or rely on the report uniqueness constraint and transaction so concurrent events cannot create duplicate reports.
 
-This reset point prevents the price movement that caused a recent report from producing the same report again, while still allowing a new report when another 5% movement occurs after the previous report.
+This reset point prevents the price movement that caused a recent report from producing the same report again, while still allowing a new report when a later movement meets a qualifying user's threshold after the previous report.
 
 ## 3. Event contracts
 
@@ -174,7 +175,7 @@ Queue names are owned by consumers. Event names are owned by producers.
 - Retry a transient failure up to five times, waiting 30 seconds between attempts.
 - The retry count excludes the initial processing attempt, allowing at most six total processing attempts.
 - Send the message to its dead-letter queue after the fifth retry fails.
-- Apply the same five retries at 30-second intervals to temporary email delivery failures. Permanent email failures are not retried.
+- Apply five retries at 30-second intervals to temporary email delivery failures. Permanent email failures are not retried. Discord delivery has one attempt and no retry as defined in [`../user-preferences/plan.md`](../user-preferences/plan.md).
 - Do not retry permanent validation failures.
 - Preserve event ID and correlation ID through retries and dead-lettering.
 
@@ -197,6 +198,11 @@ Modules/
     Domain/
     Infrastructure/
     Channels/Email/
+    Channels/Discord/
+  UserPreferences/
+    Application/
+    Domain/
+    Infrastructure/
 Shared/
   Messaging/
   Persistence/
@@ -212,7 +218,7 @@ The first refactor can use folders and namespaces inside the existing project. S
 2. Implement RabbitMQ messaging, outbox publication, consumer idempotency, retries, and dead-lettering.
 3. Move data population behind its module boundary and publish the Data Populated event.
 4. Consume new data, create immutable reports, and publish the Report Created event.
-5. Consume new reports, resolve subscriptions, and deliver through the email channel.
+5. Resolve MongoDB user preferences, evaluate per-coin thresholds, and deliver qualifying reports through email and Discord channels.
 6. Add operational visibility, migration, and remove the old direct orchestration flow.
 
 The detailed backlog and exit conditions are maintained in `tasks.md`.

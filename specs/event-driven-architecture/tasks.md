@@ -3,6 +3,7 @@
 Status: Proposed  
 System specification: [`spec.md`](spec.md)  
 Technical plan: [`plan.md`](plan.md)
+User-preferences tasks: [`../user-preferences/tasks.md`](../user-preferences/tasks.md)
 
 ## Phase 0 — Foundation
 
@@ -47,7 +48,7 @@ Exit condition: one successful population run stores unique snapshots and publis
 ## Phase 3 — Report Analysis
 
 - [x] `RPT-01` Define immutable reports and an `IReportRule` contract.
-- [x] `RPT-02` Implement the configurable daily movement rule with an initial 5% threshold and 24-hour lookback period; exactly 5% qualifies.
+- [ ] `RPT-02` Replace the former global 5% threshold with each user's per-coin threshold; retain the 24-hour lookback and qualify movements equal to a user's threshold.
 - [x] `RPT-03` On event handling, query MongoDB for the latest stored snapshot per coin, compare it with every earlier snapshot in the effective window, and use the greatest absolute percentage change as the report reference.
 - [x] `RPT-04` Reset a coin's effective window to immediately after its most recent daily movement report when that report was created within the preceding 24 hours.
 - [x] `RPT-05` Limit each analysis run to one new daily movement report per coin.
@@ -55,23 +56,24 @@ Exit condition: one successful population run stores unique snapshots and publis
 - [x] `RPT-07` Persist reports with a unique key on rule name/version, coin, and latest snapshot ID.
 - [x] `RPT-08` Save each report and its `report.created.v1` outbox event in one MongoDB transaction.
 - [x] `RPT-09` Correct the existing percentage-change calculation, which currently never assigns `PercentChanged`.
-- [ ] `RPT-10` Test upward and downward movements, the exact 5% boundary, non-positive price rejection, insufficient data, delayed and duplicate events, concurrent analysis, multiple qualifying prices, and the post-report window reset.
+- [ ] `RPT-10` Test upward and downward movements, per-user threshold boundaries, non-positive price rejection, insufficient data, delayed and duplicate events, concurrent analysis, multiple qualifying prices, and the post-report window reset.
+- [ ] `RPT-11` Persist the users qualifying for a report as an audience snapshot and keep personal data out of the RabbitMQ event payload.
 
 Exit condition: replaying a population event creates neither duplicate reports nor duplicate report events.
 
 ## Phase 4 — Delivery and email
 
-- [x] `DLV-01` Use the existing hard-coded user and favorite-coin list to resolve initial email recipients.
+- [ ] `DLV-01` Replace the former hard-coded recipient with MongoDB user preferences; see [`../user-preferences/plan.md`](../user-preferences/plan.md).
 - [x] `DLV-02` Define `IDeliveryChannel` and its result model.
 - [x] `DLV-03` Consume `report.created.v1` from RabbitMQ.
-- [x] `DLV-04` Create one delivery record per matching recipient and enabled channel.
+- [ ] `DLV-04` Create idempotent email and Discord delivery records for the report's qualified users and their current enabled endpoints.
 - [x] `DLV-05` Implement delivery retry and terminal-failure states; apply five retries at 30-second intervals for temporary email failures and do not retry permanent failures.
 - [x] `DLV-06` Extract the daily report email template renderer.
 - [x] `DLV-07` Place Mailjet SMTP behind an `IEmailSender` adapter.
 - [x] `DLV-08` Register the email channel through dependency injection.
-- [ ] `DLV-09` Test hard-coded recipient matching, duplicate events, retry timing and exhaustion, permanent SMTP errors, and templates.
+- [ ] `DLV-09` Test MongoDB user matching, per-user threshold audience, duplicate events, retry timing and exhaustion, permanent SMTP errors, Discord failure behavior, and templates.
 
-Exit condition: one report event creates one logical email delivery for the hard-coded recipient when the report matches their favorite-coin list, even after retry or replay.
+Exit condition: one report event creates one logical delivery per qualified MongoDB user and enabled channel/endpoint, even after retry or replay.
 
 ## Phase 5 — Operations and rollout
 

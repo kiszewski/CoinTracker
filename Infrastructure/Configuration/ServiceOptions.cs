@@ -24,8 +24,12 @@ public sealed class MarketDataOptions
 
 public sealed class AnalysisOptions
 {
-    public decimal MovementThresholdPercent { get; set; } = 5m;
     public int LookbackHours { get; set; } = 24;
+}
+
+public sealed class UserSecretsOptions
+{
+    public string EncryptionKey { get; set; } = "";
 }
 
 public sealed class EmailOptions

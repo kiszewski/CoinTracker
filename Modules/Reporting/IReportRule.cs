@@ -12,10 +12,11 @@ public interface IReportRule
         CoinSnapshotDocument latest,
         IReadOnlyList<CoinSnapshotDocument> lookbackSnapshots,
         DateTime effectiveWindowStartUtc,
-        Guid correlationId);
+        Guid correlationId,
+        decimal minimumThresholdPercent);
 }
 
-public sealed class DailyPriceMovementRule(IOptions<AnalysisOptions> options) : IReportRule
+public sealed class DailyPriceMovementRule : IReportRule
 {
     public string ReportType => "daily-price-movement";
     public int Version => 1;
@@ -24,7 +25,8 @@ public sealed class DailyPriceMovementRule(IOptions<AnalysisOptions> options) : 
         CoinSnapshotDocument latest,
         IReadOnlyList<CoinSnapshotDocument> lookbackSnapshots,
         DateTime effectiveWindowStartUtc,
-        Guid correlationId)
+        Guid correlationId,
+        decimal minimumThresholdPercent)
     {
         if (latest.UsdPrice <= 0)
             return null;
@@ -39,7 +41,7 @@ public sealed class DailyPriceMovementRule(IOptions<AnalysisOptions> options) : 
             .OrderByDescending(change => Math.Abs(change.Percent))
             .FirstOrDefault();
 
-        if (largestChange is null || Math.Abs(largestChange.Percent) < options.Value.MovementThresholdPercent)
+        if (largestChange is null || Math.Abs(largestChange.Percent) < minimumThresholdPercent)
             return null;
 
         return new CoinReportDocument

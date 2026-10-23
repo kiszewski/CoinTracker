@@ -13,6 +13,8 @@ public sealed class MongoStore
     public const string ReportsCollection = "reports";
     public const string DeliveriesCollection = "deliveries";
     public const string LeasesCollection = "worker_leases";
+    public const string UsersCollection = "users";
+    public const string ReportAudiencesCollection = "report_audiences";
 
     public MongoStore(IMongoClient client, IOptions<MongoOptions> options)
     {
@@ -53,11 +55,23 @@ public sealed class MongoStore
             new CreateIndexModel<CoinReportDocument>(Builders<CoinReportDocument>.IndexKeys.Ascending(x => x.IdempotencyKey), new CreateIndexOptions { Unique = true }),
             cancellationToken: cancellationToken);
 
+        var users = Database.GetCollection<UserDocument>(UsersCollection);
+        await users.Indexes.CreateManyAsync(new[]
+        {
+            new CreateIndexModel<UserDocument>(Builders<UserDocument>.IndexKeys.Ascending(x => x.NormalizedEmail), new CreateIndexOptions { Unique = true, Name = "uq_user_normalized_email" }),
+            new CreateIndexModel<UserDocument>(Builders<UserDocument>.IndexKeys.Ascending("FavoriteCoins.CoinCode"), new CreateIndexOptions { Name = "ix_user_favorite_coin" })
+        }, cancellationToken: cancellationToken);
+
+        await Database.GetCollection<ReportAudienceDocument>(ReportAudiencesCollection).Indexes.CreateOneAsync(
+            new CreateIndexModel<ReportAudienceDocument>(Builders<ReportAudienceDocument>.IndexKeys.Ascending(x => x.ReportId).Ascending(x => x.UserId), new CreateIndexOptions { Unique = true, Name = "uq_report_audience" }),
+            cancellationToken: cancellationToken);
+
         var deliveries = Database.GetCollection<DeliveryDocument>(DeliveriesCollection);
         await deliveries.Indexes.CreateManyAsync(new[]
         {
             new CreateIndexModel<DeliveryDocument>(Builders<DeliveryDocument>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.NextAttemptAtUtc)),
-            new CreateIndexModel<DeliveryDocument>(Builders<DeliveryDocument>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LeaseExpiresAtUtc))
+            new CreateIndexModel<DeliveryDocument>(Builders<DeliveryDocument>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LeaseExpiresAtUtc)),
+            new CreateIndexModel<DeliveryDocument>(Builders<DeliveryDocument>.IndexKeys.Ascending(x => x.ReportId).Ascending(x => x.UserId).Ascending(x => x.Channel).Ascending(x => x.DiscordEndpointId), new CreateIndexOptions { Unique = true, Name = "uq_delivery_destination" })
         }, cancellationToken: cancellationToken);
 
         await Database.GetCollection<OutboxPublishLeaseDocument>(LeasesCollection).Indexes.CreateOneAsync(

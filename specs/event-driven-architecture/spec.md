@@ -3,6 +3,7 @@
 Status: Proposed  
 Technical plan: [`plan.md`](plan.md)  
 Implementation tasks: [`tasks.md`](tasks.md)
+User preferences: [`../user-preferences/spec.md`](../user-preferences/spec.md)
 
 ## 1. Purpose
 
@@ -24,7 +25,7 @@ Report Created event
 Deliver report through the user's enabled channels
 ```
 
-Email is the first delivery channel. Other channels may be added later without changing how reports are created.
+Email and Discord incoming webhooks are the initial delivery channels. Other channels may be added later without changing how reports are created.
 
 ## 3. Components
 
@@ -51,7 +52,7 @@ The Report Analysis component:
 
 Initial report types:
 
-- Daily price movement: compares the newest price with all recorded prices in the effective lookback window and identifies an increase or decrease of at least 5%.
+- Daily price movement: compares the newest price with all recorded prices in the effective lookback window and creates a report only when at least one user's threshold for that coin is met.
 
 The component does not know how reports will be delivered.
 
@@ -64,11 +65,12 @@ The Delivery component:
 - Delivers the report through each user's enabled channels.
 - Records the outcome of each delivery.
 
-Initial delivery channel:
+Initial delivery channels:
 
 - Email
+- Discord incoming webhooks
 
-Future examples include push notifications, SMS, and webhooks.
+Future examples include push notifications and SMS.
 
 ## 4. Events
 
@@ -101,7 +103,7 @@ The event must identify the report so the delivery component can find its conten
 ### Report analysis
 
 - `RPT-01` When a Data Populated event is handled, the system must analyze the latest market data currently stored for each coin, even if the event refers to an older population run.
-- `RPT-02` The initial daily analysis rule must use a 5% movement threshold and a 24-hour lookback period.
+- `RPT-02` The initial daily analysis rule must use each user's configured threshold for the matching favorite coin and a 24-hour lookback period; there is no system-wide movement threshold.
 - `RPT-03` The newest stored price must be compared with every earlier price recorded in the effective lookback window.
 - `RPT-04` If no daily movement report exists for the coin in the preceding 24 hours, the effective window is the preceding 24 hours.
 - `RPT-05` If a daily movement report exists for the coin in the preceding 24 hours, the effective window starts immediately after the most recent report's creation time.
@@ -113,9 +115,9 @@ The event must identify the report so the delivery component can find its conten
 
 ### Delivery
 
-- `DLV-01` For the initial release, the existing hard-coded user and favorite-coin list determine report recipients.
-- `DLV-02` For the initial release, matching reports are delivered by email; user-managed channel preferences are outside the scope.
-- `DLV-03` A report must be delivered only when its cryptocurrency matches the initial recipient's hard-coded favorite-coin list.
+- `DLV-01` User profiles stored in MongoDB determine report recipients and delivery preferences.
+- `DLV-02` For V1, matching reports are delivered by email and registered Discord incoming webhooks.
+- `DLV-03` A report must be delivered only to users who have favorited the coin and whose threshold for that coin is met.
 - `DLV-04` The system must record whether each delivery is pending, successful, or failed.
 - `DLV-05` Temporary delivery failures must be attempted again.
 - `DLV-06` Reprocessing the same Report Created event must not create duplicate deliveries.
@@ -125,7 +127,7 @@ The event must identify the report so the delivery component can find its conten
 
 - `SYS-01` Each population flow must be traceable from data collection to report delivery.
 - `SYS-02` A failure in one component must not lose completed work from another component.
-- `SYS-03` Failed work must be recoverable without creating duplicate reports or deliveries.
+- `SYS-03` Retryable failed work must be recoverable without creating duplicate reports or deliveries; terminal channel failures must be recorded according to that channel's delivery policy.
 - `SYS-04` Sensitive configuration and user contact information must not be exposed in logs.
 
 ## 6. MVP scope
@@ -135,8 +137,8 @@ The first release includes:
 - One external market-data provider.
 - Scheduled data population.
 - Daily price-movement reports.
-- The existing hard-coded user and favorite-coin list as the initial recipient source.
-- Email delivery.
+- User profiles and per-coin thresholds stored in MongoDB; no hard-coded user is seeded or migrated.
+- Email and Discord incoming webhook delivery.
 - Visibility into population, report, and delivery outcomes.
 
 ## 7. Outside the initial scope
@@ -145,7 +147,7 @@ The first release includes:
 - Multiple market-data providers.
 - Weekly summary reports.
 - Manual population and operational endpoints.
-- A user-facing subscription management interface.
+- A graphical user interface for subscription management; V1 provides profile APIs only.
 - Independently deployed services.
 - Historical analytics beyond the initial daily reports.
 
@@ -153,7 +155,7 @@ The first release includes:
 
 ### Successful daily report
 
-Given the existing hard-coded user has Bitcoin in their favorite-coin list, when new Bitcoin data matches the daily analysis rule, then a daily report is created and delivered by email.
+Given a MongoDB user has Bitcoin as a favorite with a configured threshold, when new Bitcoin data meets that threshold, then one daily report is created and delivered to that qualifying user by email and any registered Discord endpoints.
 
 ### No matching report
 
@@ -165,7 +167,7 @@ Given a coin produced a daily movement report less than 24 hours ago, when new d
 
 ### New movement after a recent report
 
-Given a coin produced a daily movement report less than 24 hours ago, when its price subsequently moves by at least another 5% relative to a price recorded after that report, then one new daily movement report may be created.
+Given a coin produced a daily movement report less than 24 hours ago, when its price subsequently moves enough relative to a price recorded after that report to meet at least one user's threshold, then one new daily movement report may be created for qualifying users.
 
 ### Duplicate event
 
@@ -193,7 +195,7 @@ The first release is successful when:
 
 - New market data automatically starts report analysis.
 - New reports automatically start delivery.
-- Email is sent only for reports matching the initial recipient's favorite-coin list.
+- Email and Discord messages are delivered only to users whose favorite coin and per-coin threshold match the report.
 - Repeated events do not produce duplicate business results.
-- Failed deliveries can recover without recreating reports.
+- Retryable failed deliveries can recover without recreating reports; terminal Discord failures are recorded without retry.
 - A future delivery channel can be added independently.

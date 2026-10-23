@@ -85,11 +85,15 @@ public sealed class EmailDeliveryWorker(
     {
         var now = DateTime.UtcNow;
         var collection = store.Database.GetCollection<DeliveryDocument>(MongoStore.DeliveriesCollection);
+        await collection.UpdateManyAsync(x => x.Channel == "discord" && x.Status == "processing" && x.LeaseExpiresAtUtc <= now,
+            Builders<DeliveryDocument>.Update.Set(x => x.Status, "unknown").Set(x => x.LastError, "Attempt outcome unknown after worker interruption.").Set(x => x.LeaseExpiresAtUtc, null).Set(x => x.LeaseOwner, null), cancellationToken: cancellationToken);
         var filter = Builders<DeliveryDocument>.Filter.Or(
             Builders<DeliveryDocument>.Filter.And(
                 Builders<DeliveryDocument>.Filter.Eq(x => x.Status, "pending"),
+                Builders<DeliveryDocument>.Filter.Or(Builders<DeliveryDocument>.Filter.Eq(x => x.Channel, "email"), Builders<DeliveryDocument>.Filter.Eq(x => x.Attempts, 0)),
                 Builders<DeliveryDocument>.Filter.Lte(x => x.NextAttemptAtUtc, now)),
             Builders<DeliveryDocument>.Filter.And(
+                Builders<DeliveryDocument>.Filter.Eq(x => x.Channel, "email"),
                 Builders<DeliveryDocument>.Filter.Eq(x => x.Status, "processing"),
                 Builders<DeliveryDocument>.Filter.Lte(x => x.LeaseExpiresAtUtc, now)));
         var update = Builders<DeliveryDocument>.Update
@@ -136,7 +140,7 @@ public sealed class EmailDeliveryWorker(
             await store.Database.GetCollection<DeliveryDocument>(MongoStore.DeliveriesCollection)
                 .UpdateOneAsync(x => x.Id == delivery.Id && x.Status == "processing" && x.LeaseOwner == _owner, update, cancellationToken: cancellationToken);
             CoinTrackerMetrics.DeliveryCompleted(delivery.Channel, "delivered");
-            logger.LogInformation("Delivered report {ReportId} to recipient through email", delivery.ReportId);
+            logger.LogInformation("Delivered report {ReportId} through {Channel}", delivery.ReportId, delivery.Channel);
         }
         catch (PermanentDeliveryException exception)
         {
@@ -147,12 +151,19 @@ public sealed class EmailDeliveryWorker(
         {
             await store.Database.GetCollection<DeliveryDocument>(MongoStore.DeliveriesCollection)
                 .UpdateOneAsync(x => x.Id == delivery.Id && x.Status == "processing" && x.LeaseOwner == _owner,
-                    Builders<DeliveryDocument>.Update.Set(x => x.Status, "pending").Set(x => x.NextAttemptAtUtc, DateTime.UtcNow).Set(x => x.LeaseExpiresAtUtc, null).Set(x => x.LeaseOwner, null),
+                    Builders<DeliveryDocument>.Update.Set(x => x.Status, delivery.Channel == "discord" ? "unknown" : "pending").Set(x => x.NextAttemptAtUtc, DateTime.UtcNow).Set(x => x.LeaseExpiresAtUtc, null).Set(x => x.LeaseOwner, null),
                     cancellationToken: CancellationToken.None);
             throw;
         }
         catch (Exception exception)
         {
+            if (delivery.Channel == "discord")
+            {
+                await MarkFailedAsync(delivery, exception.GetType().Name, cancellationToken);
+                CoinTrackerMetrics.DeliveryCompleted(delivery.Channel, "failed");
+                logger.LogWarning("Discord delivery {DeliveryId} failed; it will not be retried", delivery.Id);
+                return;
+            }
             var attemptsAllowed = rabbitOptions.Value.RetryCount + 1;
             if (delivery.Attempts < attemptsAllowed)
             {

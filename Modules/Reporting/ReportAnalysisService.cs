@@ -33,7 +33,8 @@ public sealed class ReportAnalysisService(
         var snapshots = store.Database.GetCollection<CoinSnapshotDocument>(MongoStore.SnapshotsCollection);
         var coinCodes = await snapshots.Distinct(x => x.CoinCode, Builders<CoinSnapshotDocument>.Filter.Empty)
             .ToListAsync(cancellationToken);
-        var reportsToCreate = new List<CoinReportDocument>();
+        var reportsToCreate = new List<(CoinReportDocument Report, List<Guid> Audience)>();
+        var users = store.Database.GetCollection<UserDocument>(MongoStore.UsersCollection);
 
         foreach (var coinCode in coinCodes)
         {
@@ -43,6 +44,12 @@ public sealed class ReportAnalysisService(
                 .FirstOrDefaultAsync(cancellationToken);
             if (latest is null || latest.UsdPrice <= 0)
                 continue;
+
+            var matchingUsers = await users.Find(x => x.FavoriteCoins.Any(f => f.CoinCode == coinCode)).ToListAsync(cancellationToken);
+            if (matchingUsers.Count == 0)
+                continue;
+            var thresholds = matchingUsers.SelectMany(u => u.FavoriteCoins.Where(f => f.CoinCode == coinCode).Select(f => (u.Id, f.ThresholdPercent))).ToList();
+            var minimumThreshold = thresholds.Min(x => x.ThresholdPercent);
 
             foreach (var rule in rules)
             {
@@ -58,9 +65,9 @@ public sealed class ReportAnalysisService(
                                                                   x.ObservedAtUtc <= latest.ObservedAtUtc)
                     .SortBy(x => x.ObservedAtUtc)
                     .ToListAsync(cancellationToken);
-                var report = rule.Analyze(latest, windowSnapshots, effectiveStart, message.CorrelationId);
+                var report = rule.Analyze(latest, windowSnapshots, effectiveStart, message.CorrelationId, minimumThreshold);
                 if (report is not null)
-                    reportsToCreate.Add(report);
+                    reportsToCreate.Add((report, thresholds.Where(x => Math.Abs(report.PercentChanged) >= x.ThresholdPercent).Select(x => x.Id).Distinct().ToList()));
             }
         }
 
@@ -75,12 +82,19 @@ public sealed class ReportAnalysisService(
                 {
                     var reportCollection = store.Database.GetCollection<CoinReportDocument>(MongoStore.ReportsCollection);
                     var outbox = store.Database.GetCollection<OutboxMessageDocument>(MongoStore.OutboxCollection);
-                    foreach (var report in reportsToCreate)
+                    foreach (var candidate in reportsToCreate)
                     {
+                        var report = candidate.Report;
                         if (await reportCollection.Find(session, x => x.IdempotencyKey == report.IdempotencyKey).AnyAsync(cancellationToken))
                             continue;
 
                         await reportCollection.InsertOneAsync(session, report, cancellationToken: cancellationToken);
+                        var audienceCollection = store.Database.GetCollection<ReportAudienceDocument>(MongoStore.ReportAudiencesCollection);
+                        if (candidate.Audience.Count > 0)
+                            await audienceCollection.InsertManyAsync(session, candidate.Audience.Select(userId => new ReportAudienceDocument
+                            {
+                                Id = $"{report.Id:N}:{userId:N}", ReportId = report.Id, UserId = userId
+                            }), cancellationToken: cancellationToken);
                         createdCount++;
                         var eventEnvelope = new EventEnvelope<ReportCreatedPayload>(
                             Guid.NewGuid(), EventTypes.ReportCreated, 1, DateTime.UtcNow,

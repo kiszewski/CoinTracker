@@ -74,6 +74,40 @@ public sealed record CoinReportDocument
     public Guid CorrelationId { get; init; }
 }
 
+public sealed class UserDocument
+{
+    [BsonId]
+    public Guid Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string NormalizedEmail { get; set; } = "";
+    public List<FavoriteCoinDocument> FavoriteCoins { get; set; } = [];
+    public List<DiscordEndpointDocument> DiscordEndpoints { get; set; } = [];
+    public DateTime CreatedAtUtc { get; set; }
+    public DateTime UpdatedAtUtc { get; set; }
+}
+
+public sealed class FavoriteCoinDocument
+{
+    public string CoinCode { get; set; } = "";
+    public decimal ThresholdPercent { get; set; }
+}
+
+public sealed class DiscordEndpointDocument
+{
+    public Guid Id { get; set; }
+    public string EncryptedUrl { get; set; } = "";
+    public string MaskedIdentifier { get; set; } = "Discord webhook";
+}
+
+public sealed class ReportAudienceDocument
+{
+    [BsonId]
+    public string Id { get; set; } = "";
+    public Guid ReportId { get; set; }
+    public Guid UserId { get; set; }
+}
+
 public sealed class DeliveryDocument
 {
     [BsonId]
@@ -82,6 +116,8 @@ public sealed class DeliveryDocument
     public Guid CorrelationId { get; set; }
     public string RecipientEmail { get; set; } = "";
     public string RecipientName { get; set; } = "";
+    public Guid? UserId { get; set; }
+    public Guid? DiscordEndpointId { get; set; }
     public string Channel { get; set; } = "email";
     public string Status { get; set; } = "pending";
     public int Attempts { get; set; }
