@@ -17,6 +17,7 @@ services:
       Email__ApiKey: ${MAILJET_API_KEY:-}
       Email__SenderEmail: ${SENDER_EMAIL:-}
       Email__SenderPassword: ${SENDER_EMAIL_PASSWORD:-}
+      ASPNETCORE_ENVIRONMENT: Development
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
