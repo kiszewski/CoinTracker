@@ -1,66 +1,20 @@
 services:
   app:
-    build:
-      context: .
+    image: kiszewski/cointracker:${IMAGE_TAG:-latest}
     restart: unless-stopped
     environment:
       ASPNETCORE_URLS: http://+:8080
-      Mongo__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
-      Mongo__DatabaseName: CoinsDB
-      RabbitMq__ConnectionString: amqp://cointracker:local-dev-password@rabbitmq:5672/
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:?Set MONGO_CONNECTION_STRING}
+      Mongo__DatabaseName: ${MONGO_DATABASE_NAME:-CoinsDB}
+      RabbitMq__ConnectionString: ${RABBITMQ_CONNECTION_STRING:?Set RABBITMQ_CONNECTION_STRING}
       RabbitMq__RetryCount: 5
       RabbitMq__RetryIntervalSeconds: 30
       MarketData__ApiKey: ${GECKO_API_KEY:-}
-      MarketData__PopulationIntervalMinutes: 15
-      Analysis__LookbackHours: 24
+      MarketData__PopulationIntervalMinutes: ${POPULATION_INTERVAL_MINUTES:-15}
+      Analysis__LookbackHours: ${ANALYSIS_LOOKBACK_HOURS:-24}
       UserSecrets__EncryptionKey: ${USER_ENCRYPTION_KEY:?Set USER_ENCRYPTION_KEY to a base64-encoded 32-byte key}
       Email__ApiKey: ${MAILJET_API_KEY:-}
       Email__SenderEmail: ${SENDER_EMAIL:-}
       Email__SenderPassword: ${SENDER_EMAIL_PASSWORD:-}
     ports:
       - "127.0.0.1:8080:8080"
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      mongodb:
-        condition: service_healthy
-
-  rabbitmq:
-    image: rabbitmq:3-management
-    restart: unless-stopped
-    environment:
-      RABBITMQ_DEFAULT_USER: cointracker
-      RABBITMQ_DEFAULT_PASS: local-dev-password
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    volumes:
-      - cointracker-rabbitmq:/var/lib/rabbitmq
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
-  mongodb:
-    image: mongo:7.0
-    restart: unless-stopped
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-    ports:
-      - "27017:27017"
-    volumes:
-      - cointracker-mongodb:/data/db
-    healthcheck:
-      test:
-        - CMD-SHELL
-        - >-
-          mongosh --quiet --eval 'try { rs.status().ok } catch (e) {
-          rs.initiate({_id:"rs0",members:[{_id:0,host:"mongodb:27017"}]}).ok }' | grep 1
-      interval: 5s
-      timeout: 10s
-      retries: 30
-      start_period: 10s
-
-volumes:
-  cointracker-mongodb:
-  cointracker-rabbitmq:
