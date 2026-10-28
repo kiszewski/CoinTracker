@@ -1,0 +1,20 @@
+services:
+  app:
+    image: kiszewski/cointracker:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Mongo__ConnectionString: ${MONGO_CONNECTION_STRING:?Set MONGO_CONNECTION_STRING}
+      Mongo__DatabaseName: ${MONGO_DATABASE_NAME:-CoinsDB}
+      RabbitMq__ConnectionString: ${RABBITMQ_CONNECTION_STRING:?Set RABBITMQ_CONNECTION_STRING}
+      RabbitMq__RetryCount: 5
+      RabbitMq__RetryIntervalSeconds: 30
+      MarketData__ApiKey: ${GECKO_API_KEY:-}
+      MarketData__PopulationIntervalMinutes: ${POPULATION_INTERVAL_MINUTES:-15}
+      Analysis__LookbackHours: ${ANALYSIS_LOOKBACK_HOURS:-24}
+      UserSecrets__EncryptionKey: ${USER_ENCRYPTION_KEY:?Set USER_ENCRYPTION_KEY to a base64-encoded 32-byte key}
+      Email__ApiKey: ${MAILJET_API_KEY:-}
+      Email__SenderEmail: ${SENDER_EMAIL:-}
+      Email__SenderPassword: ${SENDER_EMAIL_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8080:8080"

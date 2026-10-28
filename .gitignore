@@ -67,7 +67,6 @@ coverage/
 *.cobertura.xml
 
 # Docker files
-.dockerignore
 docker-compose.*
 *.container.cache
 
