@@ -1,6 +1,7 @@
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.OpenTelemetry;
+using OpenTelemetry;
 
 namespace CoinTracker.Shared.Observability;
 
@@ -30,6 +31,7 @@ public static class LoggingConfiguration
                 options.ResourceAttributes["service.name"] = "cointracker-api";
                 options.ResourceAttributes["deployment.environment.name"] = environment.EnvironmentName;
                 options.BatchingOptions.QueueLimit = 10_000;
+                options.OnBeginSuppressInstrumentation = SuppressInstrumentationScope.Begin;
             }, getConfigurationVariable: name => name == "OTEL_EXPORTER_OTLP_ENDPOINT" ? endpoint.AbsoluteUri : configuration[name]);
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException)

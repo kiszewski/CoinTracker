@@ -10,6 +10,8 @@ services:
       OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-cointracker-api}
       OTEL_METRIC_EXPORT_INTERVAL: ${OTEL_METRIC_EXPORT_INTERVAL:-60000}
+      OTEL_TRACES_SAMPLER: ${OTEL_TRACES_SAMPLER:-parentbased_always_on}
+      OTEL_TRACES_SAMPLER_ARG: ${OTEL_TRACES_SAMPLER_ARG:-}
       Serilog__MinimumLevel__Default: ${Serilog__MinimumLevel__Default:-Information}
       Mongo__ConnectionString: mongodb://mongodb:27017/?replicaSet=rs0
       Mongo__DatabaseName: CoinsDB

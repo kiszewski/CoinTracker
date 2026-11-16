@@ -16,6 +16,7 @@ public sealed class MetricsExportTests
     [InlineData("/otlp")]
     [InlineData("/otlp/v1/logs")]
     [InlineData("/otlp/v1/metrics")]
+    [InlineData("/otlp/v1/traces")]
     public void ExportsConsumerMetricsWithSharedEndpointCredentialsAndResource(string path)
     {
         var builder = CreateBuilder();
@@ -26,8 +27,8 @@ public sealed class MetricsExportTests
             ["OTEL_SERVICE_NAME"] = "metrics-test"
         });
         using var handler = new CaptureHandler();
-        builder.Services.AddConsumerMetrics(builder.Configuration, builder.Environment);
-        builder.Services.Configure<OtlpExporterOptions>(options =>
+        builder.Services.AddApplicationTelemetry(builder.Configuration, builder.Environment);
+        builder.Services.Configure<OtlpExporterOptions>("metrics", options =>
             options.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false));
         using var host = builder.Build();
         var provider = host.Services.GetRequiredService<MeterProvider>();
@@ -54,9 +55,10 @@ public sealed class MetricsExportTests
     public void DoesNotRegisterExporterWithoutEndpoint()
     {
         var builder = CreateBuilder();
-        builder.Services.AddConsumerMetrics(builder.Configuration, builder.Environment);
+        builder.Services.AddApplicationTelemetry(builder.Configuration, builder.Environment);
         using var host = builder.Build();
         Assert.Null(host.Services.GetService<MeterProvider>());
+        Assert.Null(host.Services.GetService<OpenTelemetry.Trace.TracerProvider>());
     }
 
     [Fact]
@@ -65,8 +67,8 @@ public sealed class MetricsExportTests
         var builder = CreateBuilder();
         builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] = "https://collector.invalid/otlp";
         using var handler = new CaptureHandler { StatusCode = HttpStatusCode.Unauthorized };
-        builder.Services.AddConsumerMetrics(builder.Configuration, builder.Environment);
-        builder.Services.Configure<OtlpExporterOptions>(options =>
+        builder.Services.AddApplicationTelemetry(builder.Configuration, builder.Environment);
+        builder.Services.Configure<OtlpExporterOptions>("metrics", options =>
             options.HttpClientFactory = () => new HttpClient(handler, disposeHandler: false));
         using var host = builder.Build();
         var provider = host.Services.GetRequiredService<MeterProvider>();

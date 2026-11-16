@@ -27,7 +27,7 @@ try
 
     builder.Services.AddSerilog((services, logger) =>
         LoggingConfiguration.Configure(logger, builder.Configuration, builder.Environment));
-    builder.Services.AddConsumerMetrics(builder.Configuration, builder.Environment);
+    builder.Services.AddApplicationTelemetry(builder.Configuration, builder.Environment);
     builder.Services.AddOpenApi();
 
     builder.Services.AddOptions<MongoOptions>()

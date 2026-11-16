@@ -19,7 +19,7 @@ internal static class OtlpConfiguration
             throw new InvalidOperationException("OTEL_EXPORTER_OTLP_PROTOCOL must be http/protobuf.");
 
         var baseUrl = uri.AbsoluteUri.TrimEnd('/');
-        foreach (var suffix in new[] { "/v1/logs", "/v1/metrics" })
+        foreach (var suffix in new[] { "/v1/logs", "/v1/metrics", "/v1/traces" })
             if (baseUrl.EndsWith(suffix, StringComparison.Ordinal))
             {
                 baseUrl = baseUrl[..^suffix.Length];

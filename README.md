@@ -191,7 +191,7 @@ processing; console logs continue. Direct export has no durable disk buffer, so
 events can be lost during prolonged outages or abrupt shutdowns. Grafana retains
 received logs according to your Cloud retention settings, independently of Docker
 container recreation. Historical Docker logs are not backfilled. This integration
-exports application logs and the consumer metrics described below. It does not export traces.
+exports application logs, consumer metrics, and HTTP traces as described below.
 
 ### Consumer metrics in Grafana Cloud
 
@@ -234,6 +234,37 @@ In Grafana Explore, select your Prometheus/Mimir metrics data source and search 
 per-second throughput/failure rates, or `increase(...[1d])` for daily counts.
 Counters reset on application restart; rate/increase account for resets.
 The other pre-existing `CoinTracker` instruments are not included in this exporter.
+
+### HTTP traces in Grafana Cloud
+
+OpenTelemetry traces incoming ASP.NET Core requests and outgoing `HttpClient`
+requests, including method, duration, route, response status, and failures.
+Incoming W3C `traceparent` context is continued, and outgoing requests propagate
+that context to downstream services. Logs written inside an HTTP span include its
+trace and span IDs in their OTLP records for correlation in Grafana.
+
+Tracing uses the same OTLP endpoint, headers, service name, and environment as
+metrics. The SDK sends spans in batches to the base endpoint plus `/v1/traces`;
+the Grafana token also needs **traces write** permission. Tracing is disabled when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is empty.
+
+By default, new root traces are sampled and incoming parent sampling decisions
+are respected. Both Compose files forward standard sampling settings. To sample
+10% of new root traces while respecting incoming parents, set:
+
+```dotenv
+OTEL_TRACES_SAMPLER=parentbased_traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
+```
+
+Request/response bodies and authorization headers are not captured. Query values
+use the instrumentation's default redaction, and webhook credentials in URL paths
+are redacted before spans are exported. Telemetry-export HTTP requests are
+suppressed to prevent traces of the exporters themselves.
+
+After deploying, call an API endpoint (for example `/health`) and select the
+Tempo/traces data source in Grafana Explore. Search for
+`{ resource.service.name = "cointracker-api" }` and inspect the request waterfall.
 
 The app reads standard .NET environment variables. The local Compose file supplies MongoDB and RabbitMQ settings for its containers. The VM Compose file takes `MONGO_CONNECTION_STRING`, `RABBITMQ_CONNECTION_STRING`, and `USER_ENCRYPTION_KEY` from its environment; provider and email settings can also be supplied there.
 

@@ -1,12 +1,13 @@
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 
 namespace CoinTracker.Shared.Observability;
 
-public static class MetricsConfiguration
+public static class TelemetryConfiguration
 {
-    public static void AddConsumerMetrics(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    public static void AddApplicationTelemetry(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var endpoint = OtlpConfiguration.GetBaseEndpoint(configuration);
         if (endpoint is null) return;
@@ -21,9 +22,19 @@ public static class MetricsConfiguration
                 }))
             .WithMetrics(metrics => metrics
                 .AddMeter(CoinTrackerMetrics.ConsumerMeterName)
-                .AddOtlpExporter(options =>
+                .AddOtlpExporter("metrics", options =>
                 {
                     options.Endpoint = new Uri(endpoint, "v1/metrics");
+                    options.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    options.Headers = configuration["OTEL_EXPORTER_OTLP_HEADERS"];
+                }))
+            .WithTracing(traces => traces
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddProcessor(new HttpTraceRedactionProcessor())
+                .AddOtlpExporter("traces", options =>
+                {
+                    options.Endpoint = new Uri(endpoint, "v1/traces");
                     options.Protocol = OtlpExportProtocol.HttpProtobuf;
                     options.Headers = configuration["OTEL_EXPORTER_OTLP_HEADERS"];
                 }));
