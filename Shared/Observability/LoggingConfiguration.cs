@@ -17,31 +17,20 @@ public static class LoggingConfiguration
             .Enrich.FromLogContext()
             .WriteTo.Console(outputTemplate: ConsoleTemplate);
 
-        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
-        if (string.IsNullOrWhiteSpace(endpoint)) return;
-
-        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
-            uri.Scheme is not ("http" or "https") || string.IsNullOrEmpty(uri.Host) ||
-            !string.IsNullOrEmpty(uri.UserInfo) || !string.IsNullOrEmpty(uri.Query) ||
-            !string.IsNullOrEmpty(uri.Fragment))
-            throw new InvalidOperationException(
-                "OTEL_EXPORTER_OTLP_ENDPOINT must be an absolute HTTP(S) base URL without credentials, query, or fragment.");
-
-        var protocol = configuration["OTEL_EXPORTER_OTLP_PROTOCOL"];
-        if (!string.IsNullOrWhiteSpace(protocol) && protocol != "http/protobuf")
-            throw new InvalidOperationException("OTEL_EXPORTER_OTLP_PROTOCOL must be http/protobuf.");
+        var endpoint = OtlpConfiguration.GetBaseEndpoint(configuration);
+        if (endpoint is null) return;
 
         try
         {
             logger.WriteTo.OpenTelemetry(options =>
             {
-                options.Endpoint = endpoint;
+                options.Endpoint = endpoint.AbsoluteUri;
                 options.Protocol = OtlpProtocol.HttpProtobuf;
                 options.IncludedData |= IncludedData.SourceContextAttribute;
                 options.ResourceAttributes["service.name"] = "cointracker-api";
                 options.ResourceAttributes["deployment.environment.name"] = environment.EnvironmentName;
                 options.BatchingOptions.QueueLimit = 10_000;
-            }, getConfigurationVariable: name => configuration[name]);
+            }, getConfigurationVariable: name => name == "OTEL_EXPORTER_OTLP_ENDPOINT" ? endpoint.AbsoluteUri : configuration[name]);
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException)
         {

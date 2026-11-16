@@ -8,4 +8,5 @@ obj/
 specs/
 node_modules/
 TestResults/
+Tests/
 coverage/

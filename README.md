@@ -191,7 +191,49 @@ processing; console logs continue. Direct export has no durable disk buffer, so
 events can be lost during prolonged outages or abrupt shutdowns. Grafana retains
 received logs according to your Cloud retention settings, independently of Docker
 container recreation. Historical Docker logs are not backfilled. This integration
-exports application logs only, not metrics or traces.
+exports application logs and the consumer metrics described below. It does not export traces.
+
+### Consumer metrics in Grafana Cloud
+
+The OpenTelemetry metrics SDK exports these three instruments over HTTP/protobuf
+to the same Grafana Cloud OTLP gateway as the logs:
+
+- `cointracker.consumer.messages.processed`: counter of successfully handled and
+  acknowledged messages. Successful redeliveries also count; this is not a unique-event count.
+- `cointracker.consumer.processing.failures`: counter of failed processing attempts,
+  including malformed messages, acknowledgement errors, and each failed retry.
+  Scheduling a retry does not add a second failure; shutdown cancellation is excluded.
+- `cointracker.consumer.active`: gauge of registered, open RabbitMQ subscriptions,
+  per queue and application instance. It reports zero on cancellation, connection
+  loss, and shutdown, and returns to one after successful consumer recovery.
+
+Every metric has a `queue` attribute. Resources include `service.name`,
+`deployment.environment.name`, and a generated `service.instance.id` so multiple
+app instances have distinct series. Sum active-consumer series across instances
+to see the total consumers for a queue. A crashed instance cannot emit a final zero;
+use Grafana's no-data/staleness handling for missing series.
+
+The existing `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`,
+`OTEL_EXPORTER_OTLP_HEADERS`, and `OTEL_SERVICE_NAME` settings configure both
+signals. Ensure the Grafana token has **metrics write** permission as well as
+**logs write** permission. The metrics endpoint is the base URL plus `/v1/metrics`.
+No exporter is registered when the base endpoint is empty.
+
+Metrics are exported every 60 seconds by default. Both Compose files also forward
+`OTEL_METRIC_EXPORT_INTERVAL` (milliseconds); for example:
+
+```dotenv
+OTEL_METRIC_EXPORT_INTERVAL=60000
+```
+
+In Grafana Explore, select your Prometheus/Mimir metrics data source and search for
+`cointracker_consumer_`. With Grafana's standard OTLP name conversion, use
+`cointracker_consumer_messages_processed_total` and
+`cointracker_consumer_processing_failures_total` for counters, and
+`cointracker_consumer_active` for the gauge. Apply `rate(...[5m])` to counters for
+per-second throughput/failure rates, or `increase(...[1d])` for daily counts.
+Counters reset on application restart; rate/increase account for resets.
+The other pre-existing `CoinTracker` instruments are not included in this exporter.
 
 The app reads standard .NET environment variables. The local Compose file supplies MongoDB and RabbitMQ settings for its containers. The VM Compose file takes `MONGO_CONNECTION_STRING`, `RABBITMQ_CONNECTION_STRING`, and `USER_ENCRYPTION_KEY` from its environment; provider and email settings can also be supplied there.
 

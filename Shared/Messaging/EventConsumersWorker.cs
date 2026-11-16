@@ -23,6 +23,8 @@ public sealed class EventConsumersWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _stoppingToken = stoppingToken;
+        CoinTrackerMetrics.TrackConsumer(ReportingQueue, () => false);
+        CoinTrackerMetrics.TrackConsumer(DeliveryQueue, () => false);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -88,6 +90,9 @@ public sealed class EventConsumersWorker(
         Func<EventEnvelope<TPayload>, CancellationToken, Task> handler)
     {
         var consumer = new AsyncEventingBasicConsumer(channel);
+        // RabbitMQ updates IsRunning on registration, cancellation, shutdown, and recovery.
+        // Reading channel state as well avoids reporting a subscription during a connection outage.
+        CoinTrackerMetrics.TrackConsumer(queue, () => consumer.IsRunning && channel.IsOpen);
         consumer.Received += async (_, args) =>
         {
             var cancellationToken = stoppingToken;
@@ -105,8 +110,8 @@ public sealed class EventConsumersWorker(
                     ["ConsumerQueue"] = queue
                 });
                 await handler(envelope, cancellationToken);
-                CoinTrackerMetrics.EventHandled(queue, "succeeded");
                 channel.BasicAck(args.DeliveryTag, multiple: false);
+                CoinTrackerMetrics.EventHandled(queue, "succeeded");
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
