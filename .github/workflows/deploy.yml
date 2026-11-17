@@ -53,7 +53,7 @@ jobs:
             '{
               commands: [
                 "set -e",
-                "cd /cointracker",
+                "cd /home/ubuntu/cointracker",
                 ("export IMAGE_TAG=" + $tag),
                 "docker compose pull",
                 "docker compose up -d --wait --wait-timeout 120"
