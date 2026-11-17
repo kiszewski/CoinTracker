@@ -131,6 +131,141 @@ The VM Compose file binds port `8080` to `127.0.0.1`; use a private network or a
 
 ## Configuration
 
+### Logs in Grafana Cloud
+
+The API and background consumers use Serilog. Logs always go to the console, including
+timestamps, logger categories, exceptions, and structured scope properties. Cloud export
+is optional: leaving `OTEL_EXPORTER_OTLP_ENDPOINT` empty keeps console-only logging.
+
+In your Grafana Cloud stack, open the **OpenTelemetry** connection tile and generate
+an endpoint and authorization header with permission to write logs. See
+[Grafana Cloud OTLP setup](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
+Add these values to the VM's private `.env` file (placeholders below):
+
+```dotenv
+OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-YOUR-REGION.grafana.net/otlp
+OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic YOUR_BASE64_INSTANCE_ID_AND_TOKEN"
+OTEL_SERVICE_NAME=cointracker-api
+Serilog__MinimumLevel__Default=Information
+```
+
+Copy the authorization header from Grafana; keep it out of source control. Use the
+OTLP gateway base URL, rather than the Loki push URL. The sink appends `/v1/logs`
+once, including when the configured URL already ends in `/v1/logs`. HTTP/protobuf
+is the supported transport. Both Compose files forward these variables to the app.
+Recreate the app after updating its environment:
+
+```bash
+docker compose up -d app
+docker compose logs --since 10m --timestamps app
+```
+
+For local Compose commands, add `-f compose.local.yaml`. For `dotnet run`, export
+the variables in the shell; .NET does not automatically load `.env` files.
+`Serilog__MinimumLevel__Default=Debug` increases verbosity; category overrides use
+standard .NET configuration keys, for example
+`Serilog__MinimumLevel__Override__Microsoft.AspNetCore=Warning`.
+
+In Grafana **Explore**, choose the Logs/Loki data source, set the time range to
+the desired days, and start with:
+
+```logql
+{service_name="cointracker-api"}
+```
+
+To find consumer messages:
+
+```logql
+{service_name="cointracker-api"} | SourceContext="CoinTracker.Shared.Messaging.EventConsumersWorker"
+```
+
+Structured metadata includes `SourceContext` and any properties present on the
+event, such as `ConsumerQueue`, `EventId`, and `CorrelationId`. The resource also
+includes `deployment.environment.name` from the ASP.NET Core environment.
+Metadata field names can be inspected in Explore if your stack normalizes them.
+
+Export is asynchronous with a bounded queue of 10,000 events and a graceful-shutdown
+flush. An unreachable endpoint or rejected credentials do not stop application
+processing; console logs continue. Direct export has no durable disk buffer, so
+events can be lost during prolonged outages or abrupt shutdowns. Grafana retains
+received logs according to your Cloud retention settings, independently of Docker
+container recreation. Historical Docker logs are not backfilled. This integration
+exports application logs, consumer metrics, and HTTP traces as described below.
+
+### Consumer metrics in Grafana Cloud
+
+The OpenTelemetry metrics SDK exports these three instruments over HTTP/protobuf
+to the same Grafana Cloud OTLP gateway as the logs:
+
+- `cointracker.consumer.messages.processed`: counter of successfully handled and
+  acknowledged messages. Successful redeliveries also count; this is not a unique-event count.
+- `cointracker.consumer.processing.failures`: counter of failed processing attempts,
+  including malformed messages, acknowledgement errors, and each failed retry.
+  Scheduling a retry does not add a second failure; shutdown cancellation is excluded.
+- `cointracker.consumer.active`: gauge of registered, open RabbitMQ subscriptions,
+  per queue and application instance. It reports zero on cancellation, connection
+  loss, and shutdown, and returns to one after successful consumer recovery.
+
+Every metric has a `queue` attribute. Resources include `service.name`,
+`deployment.environment.name`, and a generated `service.instance.id` so multiple
+app instances have distinct series. Sum active-consumer series across instances
+to see the total consumers for a queue. A crashed instance cannot emit a final zero;
+use Grafana's no-data/staleness handling for missing series.
+
+The existing `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_PROTOCOL`,
+`OTEL_EXPORTER_OTLP_HEADERS`, and `OTEL_SERVICE_NAME` settings configure both
+signals. Ensure the Grafana token has **metrics write** permission as well as
+**logs write** permission. The metrics endpoint is the base URL plus `/v1/metrics`.
+No exporter is registered when the base endpoint is empty.
+
+Metrics are exported every 60 seconds by default. Both Compose files also forward
+`OTEL_METRIC_EXPORT_INTERVAL` (milliseconds); for example:
+
+```dotenv
+OTEL_METRIC_EXPORT_INTERVAL=60000
+```
+
+In Grafana Explore, select your Prometheus/Mimir metrics data source and search for
+`cointracker_consumer_`. With Grafana's standard OTLP name conversion, use
+`cointracker_consumer_messages_processed_total` and
+`cointracker_consumer_processing_failures_total` for counters, and
+`cointracker_consumer_active` for the gauge. Apply `rate(...[5m])` to counters for
+per-second throughput/failure rates, or `increase(...[1d])` for daily counts.
+Counters reset on application restart; rate/increase account for resets.
+The other pre-existing `CoinTracker` instruments are not included in this exporter.
+
+### HTTP traces in Grafana Cloud
+
+OpenTelemetry traces incoming ASP.NET Core requests and outgoing `HttpClient`
+requests, including method, duration, route, response status, and failures.
+Incoming W3C `traceparent` context is continued, and outgoing requests propagate
+that context to downstream services. Logs written inside an HTTP span include its
+trace and span IDs in their OTLP records for correlation in Grafana.
+
+Tracing uses the same OTLP endpoint, headers, service name, and environment as
+metrics. The SDK sends spans in batches to the base endpoint plus `/v1/traces`;
+the Grafana token also needs **traces write** permission. Tracing is disabled when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is empty.
+
+By default, new root traces are sampled and incoming parent sampling decisions
+are respected. Both Compose files forward standard sampling settings. To sample
+10% of new root traces while respecting incoming parents, set:
+
+```dotenv
+OTEL_TRACES_SAMPLER=parentbased_traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
+```
+
+Request/response bodies and authorization headers are not captured. Query values
+use the instrumentation's default redaction, and webhook credentials in URL paths
+are redacted before spans are exported. Telemetry-export HTTP requests are
+suppressed to prevent traces of the exporters themselves.
+
+After deploying, call an API endpoint (for example `/health`) and select the
+Tempo/traces data source in Grafana Explore. Search for
+`{ resource.service.name = "cointracker-api" }` and inspect the request waterfall.
+
 The app reads standard .NET environment variables. The local Compose file supplies MongoDB and RabbitMQ settings for its containers. The VM Compose file takes `MONGO_CONNECTION_STRING`, `RABBITMQ_CONNECTION_STRING`, and `USER_ENCRYPTION_KEY` from its environment; provider and email settings can also be supplied there.
 
 Important settings:
